@@ -1,20 +1,86 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Store, MapPin, Clock, FileText, IndianRupee } from 'lucide-react';
 
 export default function ShopSettings() {
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  
+  const [settings, setSettings] = useState({
+    shopName: '',
+    shopDescription: '',
+    category: '',
+    location: '',
+    openingTime: '',
+    closingTime: '',
+    upiId: '',
+    gstNumber: ''
+  });
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/shop/settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.shop) {
+            setSettings({
+              shopName: data.shop.shopName || '',
+              shopDescription: data.shop.shopDescription || '',
+              category: data.shop.category || 'Grocery',
+              location: data.shop.location || '',
+              openingTime: data.shop.openingTime || '09:00',
+              closingTime: data.shop.closingTime || '21:00',
+              upiId: data.shop.upiId || '',
+              gstNumber: data.shop.gstNumber || ''
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch settings', e);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setSettings({ ...settings, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/shop/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      if (res.ok) {
+        alert('Settings saved successfully!');
+        // Refresh the page to update the header if shop name changed
+        window.location.reload();
+      } else {
+        const data = await res.json();
+        alert('Failed to save settings: ' + data.message);
+      }
+    } catch (error) {
+      alert('Error saving settings');
+    } finally {
       setLoading(false);
-      alert('Settings saved successfully!');
-    }, 1000);
+    }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -36,17 +102,17 @@ export default function ShopSettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Shop Name *</label>
-              <input type="text" defaultValue="Digamber Store" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all" />
+              <input type="text" name="shopName" value={settings.shopName} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all" />
             </div>
             
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Shop Description</label>
-              <textarea rows={3} defaultValue="You can buy all type of grocery items in one place. With good Market rate." className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all resize-none"></textarea>
+              <textarea name="shopDescription" rows={3} value={settings.shopDescription} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all resize-none"></textarea>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
-              <select defaultValue="Grocery" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all">
+              <select name="category" value={settings.category} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all">
                 <option value="Grocery">Grocery</option>
                 <option value="General Store">General Store</option>
                 <option value="Hardware">Hardware</option>
@@ -68,21 +134,21 @@ export default function ShopSettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Full Address *</label>
-              <input type="text" defaultValue="Sh13, 825412, Doranda, Dhanwar, Giridih, Jharkhand, India" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
+              <input type="text" name="location" value={settings.location} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
             </div>
             
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" /> Opening Time *
               </label>
-              <input type="time" defaultValue="09:00" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
+              <input type="time" name="openingTime" value={settings.openingTime} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
             </div>
             
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Clock size={16} className="text-gray-400" /> Closing Time *
               </label>
-              <input type="time" defaultValue="21:00" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
+              <input type="time" name="closingTime" value={settings.closingTime} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-emerald-500 focus:border-emerald-500 p-3 outline-none transition-all" />
             </div>
           </div>
         </div>
@@ -99,9 +165,9 @@ export default function ShopSettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <IndianRupee size={16} className="text-gray-400" /> UPI ID *
+                <IndianRupee size={16} className="text-gray-400" /> UPI ID
               </label>
-              <input type="text" placeholder="yournumber@upi" required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-3 outline-none transition-all" />
+              <input type="text" name="upiId" value={settings.upiId} onChange={handleChange} placeholder="yournumber@upi" className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-3 outline-none transition-all" />
               <p className="text-xs text-gray-500 mt-1">This UPI ID will be used to receive payments.</p>
             </div>
             
@@ -109,7 +175,7 @@ export default function ShopSettings() {
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <FileText size={16} className="text-gray-400" /> GST Number (Optional)
               </label>
-              <input type="text" placeholder="Enter 15-digit GSTIN" className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-3 outline-none transition-all" />
+              <input type="text" name="gstNumber" value={settings.gstNumber} onChange={handleChange} placeholder="Enter 15-digit GSTIN" className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 p-3 outline-none transition-all" />
             </div>
           </div>
         </div>

@@ -2,22 +2,46 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X } from 'lucide-react';
+import { SHOP_CATEGORIES } from '@/lib/categories';
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shopCategory, setShopCategory] = useState<string>('General Store');
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [newProduct, setNewProduct] = useState({ 
-    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '' 
+    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', productId: '',
+    deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true
   });
   
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
+    const fetchShopProfile = async () => {
+      try {
+        const res = await fetch('/api/shop/profile');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile?.category) {
+            setShopCategory(data.profile.category);
+          } else if (data.profile?.type) {
+            setShopCategory(data.profile.type);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch shop profile', e);
+      }
+    };
+    fetchShopProfile();
+
     const fetchProducts = async () => {
       try {
         const res = await fetch('/api/shop/products');
@@ -67,9 +91,10 @@ export default function ProductsPage() {
     setNewProduct(prev => ({
       ...prev,
       name: suggestion.name,
+      productId: suggestion._id,
       description: suggestion.description || prev.description,
       category: suggestion.category || prev.category,
-      image: suggestion.image || prev.image
+      image: suggestion.img?.url || suggestion.image || prev.image
     }));
     setShowSuggestions(false);
   };
@@ -85,8 +110,27 @@ export default function ProductsPage() {
     }
   };
 
+  const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File size should be less than 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditingProduct((prev: any) => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newProduct.productId) {
+      alert('Please select an item from the recommended items list first.');
+      return;
+    }
     setAddingProduct(true);
     try {
       const res = await fetch('/api/shop/products', {
@@ -98,18 +142,18 @@ export default function ProductsPage() {
       if (res.ok) {
         setProducts(prev => [
           {
-            id: data.product._id,
-            name: data.product.name,
+            _id: data.product._id,
+            name: newProduct.name,
             price: data.product.price,
             qty: data.product.quantity,
-            category: data.product.category,
+            category: newProduct.category,
             loc: '-',
-            image: data.product.img?.url || 'https://images.unsplash.com/photo-1627483262112-039e9a0a0d16?w=200&q=80'
+            image: newProduct.image || '/placeholder.png'
           },
           ...prev
         ]);
         setShowAddModal(false);
-        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '' });
+        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', productId: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
         alert('Product added successfully!');
       } else {
         alert(data.error || 'Failed to add product');
@@ -120,6 +164,66 @@ export default function ProductsPage() {
       setAddingProduct(false);
     }
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+    try {
+      const res = await fetch(`/api/shop/products/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => (p._id || p.id) !== id));
+      } else {
+        alert('Failed to delete product');
+      }
+    } catch (e) {
+      alert('Error deleting product');
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setSavingEdit(true);
+    try {
+      const payload = {
+        price: editingProduct.price,
+        stock: editingProduct.quantity || editingProduct.qty,
+        discountPercent: editingProduct.discount,
+        name: editingProduct.name,
+        category: editingProduct.category,
+        description: editingProduct.description,
+        image: editingProduct.image
+      };
+      const res = await fetch(`/api/shop/products/${editingProduct._id || editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setProducts(prev => prev.map(p => (p._id || p.id) === (editingProduct._id || editingProduct.id) ? { 
+          ...p, 
+          price: editingProduct.price, 
+          quantity: editingProduct.quantity || editingProduct.qty, 
+          discount: editingProduct.discount,
+          name: editingProduct.name,
+          itemCategory: editingProduct.category,
+          description: editingProduct.description,
+          image: editingProduct.image,
+          img: { url: editingProduct.image || p.img?.url }
+        } : p));
+        setShowEditModal(false);
+        setEditingProduct(null);
+      } else {
+        alert('Failed to update product');
+      }
+    } catch (e) {
+      alert('Error updating product');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const filteredProducts = products.filter(p => (p.name || p.product?.name || p.product?.productName || '').toLowerCase().includes(search.toLowerCase()));
+  const displayedProducts = filteredProducts.slice(0, visibleCount);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -182,37 +286,47 @@ export default function ProductsPage() {
                     No products found. Click "Add New Product" to get started.
                   </td>
                 </tr>
-              ) : products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50/50 transition-colors group">
+              ) : displayedProducts.map((product) => (
+                <tr key={product._id || product.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="p-6">
                     <div className="flex items-center gap-4">
-                      <img src={product.image} alt={product.name} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shadow-sm" />
+                      <img src={product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'} alt={product.name || product.product?.name || product.product?.productName} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shadow-sm" />
                       <div>
-                        <p className="font-bold text-gray-900">{product.name}</p>
+                        <p className="font-bold text-gray-900">{product.name || product.product?.name || product.product?.productName}</p>
                         <div className="flex items-center text-xs text-gray-500 mt-1 gap-1">
-                          <MapPin size={12} /> {product.loc}
+                          <MapPin size={12} /> {product.loc || 'In Stock'}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="p-6">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600">
-                      <Tag size={12} /> {product.category}
+                      <Tag size={12} /> {product.itemCategory || product.product?.category || product.product?.categories || product.category || 'General'}
                     </span>
                   </td>
                   <td className="p-6 font-bold text-gray-900">₹{product.price}</td>
                   <td className="p-6">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${product.qty > 10 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                      <span className="font-semibold text-gray-700">{product.qty} units</span>
+                      <div className={`w-2 h-2 rounded-full ${(product.quantity || product.qty) > 10 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                      <span className="font-semibold text-gray-700">{product.quantity || product.qty} units</span>
                     </div>
                   </td>
                   <td className="p-6 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                    <div className="flex items-center justify-end gap-2 transition-opacity">
+                      <button onClick={() => { 
+                        setEditingProduct({
+                          ...product, 
+                          name: product.name || product.product?.name || '', 
+                          category: product.itemCategory || product.category || product.product?.category || '',
+                          description: product.description || product.product?.description || '',
+                          discount: product.discount || product.discountPercent || 0,
+                          image: product.img?.url || product.product?.img?.url || product.image || ''
+                        }); 
+                        setShowEditModal(true); 
+                      }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                         <Edit2 size={18} />
                       </button>
-                      <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                      <button onClick={() => handleDelete(product._id || product.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -223,12 +337,18 @@ export default function ProductsPage() {
           </table>
         </div>
         
-        {/* Pagination placeholder */}
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <p>Showing {products.length > 0 ? 1 : 0} to {products.length} of {products.length} products</p>
+        {/* Pagination */}
+        <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+          <p>Showing {displayedProducts.length > 0 ? 1 : 0} to {displayedProducts.length} of {filteredProducts.length} products</p>
           <div className="flex gap-2">
-            <button className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50" disabled>Previous</button>
-            <button className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50" disabled>Next</button>
+            {visibleCount < filteredProducts.length && (
+              <button 
+                onClick={() => setVisibleCount(prev => prev + 10)} 
+                className="px-6 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition-colors shadow-sm"
+              >
+                Load More (+10)
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -264,8 +384,8 @@ export default function ProductsPage() {
                           className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0"
                           onClick={() => handleSelectSuggestion(item)}
                         >
-                          {item.image ? (
-                            <img src={item.image} alt={item.name} className="w-8 h-8 rounded object-cover shadow-sm bg-gray-100 shrink-0" />
+                          {item.img?.url || item.image ? (
+                            <img src={item.img?.url || item.image} alt={item.name} className="w-8 h-8 rounded object-cover shadow-sm bg-gray-100 shrink-0" />
                           ) : (
                             <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center shrink-0">
                               <Box size={14} className="text-gray-400" />
@@ -285,13 +405,20 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Item Image</label>
                   <div className="flex items-center gap-3 w-full bg-white border border-gray-300 rounded-lg p-2">
-                    <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors">
-                      Choose file
+                    {newProduct.image && (
+                      <div className="shrink-0 w-12 h-12 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                        <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
+                      {newProduct.image ? 'Change Image' : 'Choose file'}
                       <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                     </label>
-                    <span className="text-sm font-bold text-gray-700 truncate flex-1">
-                      {newProduct.image ? 'Image selected' : 'No file chosen'}
-                    </span>
+                    {!newProduct.image && (
+                      <span className="text-sm font-bold text-gray-700 truncate flex-1">
+                        No file chosen
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -320,20 +447,92 @@ export default function ProductsPage() {
                   <label className="block text-sm font-bold text-gray-700 mb-1">Item Category</label>
                   <select required value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none">
                     <option value="" disabled>Select Category</option>
-                    <option value="Sweets">Sweets (Mithai)</option>
-                    <option value="Namkeen">Namkeen & Savouries</option>
-                    <option value="Bakery">Bakery & Cakes</option>
-                    <option value="Snacks">Snacks & Fast Food</option>
-                    <option value="Beverages">Beverages</option>
-                    <option value="Gift Boxes">Gift Boxes</option>
-                    <option value="Dairy">Dairy Products</option>
+                    {(SHOP_CATEGORIES[shopCategory as keyof typeof SHOP_CATEGORIES] || SHOP_CATEGORIES['General Store']).map((cat) => (
+                      <option key={cat.name} value={cat.name}>{cat.name} {cat.icon}</option>
+                    ))}
                     <option value="Other">Other</option>
                   </select>
                 </div>
+
+
               </div>
               <div className="mt-8 pt-4 flex">
                 <button type="submit" disabled={addingProduct} className="w-full px-4 py-3 font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 text-lg">
                   {addingProduct ? 'Adding...' : 'Add Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
+              <h3 className="text-xl font-bold text-gray-900">Edit Product</h3>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Product Name</label>
+                  <input required type="text" value={editingProduct.name || ''} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Product Name" />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Item Image</label>
+                  <div className="flex items-center gap-3 w-full bg-white border border-gray-300 rounded-lg p-2">
+                    {editingProduct.image && (
+                      <div className="shrink-0 w-12 h-12 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                        <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
+                      {editingProduct.image ? 'Change Image' : 'Choose file'}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleEditImageUpload} />
+                    </label>
+                    {!editingProduct.image && (
+                      <span className="text-sm font-bold text-gray-700 truncate flex-1">
+                        No file chosen
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Category</label>
+                  <select required value={editingProduct.category || ''} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="" disabled>Select Category</option>
+                    {(SHOP_CATEGORIES[shopCategory as keyof typeof SHOP_CATEGORIES] || SHOP_CATEGORIES['General Store']).map((cat) => (
+                      <option key={cat.name} value={cat.name}>{cat.name} {cat.icon}</option>
+                    ))}
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Price (₹)</label>
+                    <input required type="number" min="0" value={editingProduct.price || ''} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Discount (%)</label>
+                    <input type="number" min="0" max="100" value={editingProduct.discount || ''} onChange={e => setEditingProduct({...editingProduct, discount: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Stock Quantity</label>
+                  <input required type="number" min="0" value={editingProduct.quantity || editingProduct.qty || ''} onChange={e => setEditingProduct({...editingProduct, quantity: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
+                  <textarea rows={2} value={editingProduct.description || ''} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Product details..."></textarea>
+                </div>
+                <button disabled={savingEdit} type="submit" className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-200">
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mobile and password are required' }, { status: 400 });
     }
 
-    const backendRes = await fetch('https://www.pasr.in/api/auth/login', {
+    const backendRes = await fetch(`${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

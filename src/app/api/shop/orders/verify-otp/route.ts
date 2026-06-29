@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing orderId or OTP' }, { status: 400 });
     }
 
-    const backendUrl = `https://www.pasr.in/api/shop/orders/verify-otp`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/orders/verify-otp`;
     const backendRes = await fetch(backendUrl, {
       method: 'POST',
       headers: {

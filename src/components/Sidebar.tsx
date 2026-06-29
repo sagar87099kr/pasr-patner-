@@ -31,6 +31,7 @@ const roleConfig = {
       { name: 'Dashboard', href: '/shop', icon: LayoutDashboard },
       { name: 'Orders', href: '/shop/orders', icon: ShoppingCart },
       { name: 'Products', href: '/shop/products', icon: Package },
+      { name: 'Billing (POS)', href: '/shop/billing', icon: Wallet },
       { name: 'Settings', href: '/shop/settings', icon: Settings },
     ]
   },

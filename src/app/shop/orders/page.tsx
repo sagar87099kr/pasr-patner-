@@ -32,9 +32,10 @@ export default function OrdersPage() {
   const tabs = ['New Orders', 'Accepted', 'Delivered', 'Cancelled', 'All'];
 
   const filteredOrders = orders.filter(order => {
-    if (activeTab === 'New Orders') return order.status === 'Pending' || order.status === 'CREATED';
+    const status = order.status || order.orderStatus;
+    if (activeTab === 'New Orders') return status === 'Pending' || status === 'CREATED' || status === 'ORDER_SHARED';
     if (activeTab === 'All') return true;
-    return order.status === activeTab;
+    return status === activeTab || status?.toUpperCase() === activeTab.toUpperCase();
   }).filter(order => 
     order.orderId?.toLowerCase().includes(search.toLowerCase()) || 
     order.customerName?.toLowerCase().includes(search.toLowerCase())
@@ -81,6 +82,28 @@ export default function OrdersPage() {
       alert('Verification failed');
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const updateOrderStatus = async (id: string, newStatus: string) => {
+    if (newStatus === 'CANCELLED' && !confirm('Are you sure you want to cancel this order?')) return;
+    try {
+      const res = await fetch(`/api/shop/orders/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        setOrders(prev => prev.map(o => (o._id || o.id) === id ? { ...o, orderStatus: newStatus } : o));
+        if (selectedOrder && (selectedOrder._id || selectedOrder.id) === id) {
+          setSelectedOrder({ ...selectedOrder, orderStatus: newStatus });
+        }
+      } else {
+        const errorText = await res.text();
+        alert('Failed to update status: ' + errorText);
+      }
+    } catch (e: any) {
+      alert('Error updating status: ' + e.message);
     }
   };
 
@@ -150,15 +173,15 @@ export default function OrdersPage() {
                   </td>
                 </tr>
               ) : filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50/50 transition-colors group">
+                <tr key={order._id || order.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="p-6">
                     <p className="font-bold text-gray-900">{order.orderId}</p>
-                    <p className="text-xs text-gray-500 mt-1">{order.createdAt}</p>
+                    <p className="text-xs text-gray-500 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
                   </td>
                   <td className="p-6">
-                    <p className="font-semibold text-gray-900">{order.customerName}</p>
+                    <p className="font-semibold text-gray-900">{order.customerId?.name || order.customerName || 'Guest'}</p>
                     <div className="flex flex-col gap-1 text-xs text-gray-500 mt-2">
-                      <span className="flex items-center gap-1"><Phone size={12}/> {order.customerPhone}</span>
+                      <span className="flex items-center gap-1"><Phone size={12}/> {order.customerId?.username || order.customerPhone || 'N/A'}</span>
                       <span className="flex items-center gap-1">
                         {order.deliveryType?.toLowerCase().includes('self') ? <PackageCheck size={12}/> : <Truck size={12}/>} 
                         {order.deliveryType}
@@ -179,8 +202,8 @@ export default function OrdersPage() {
                     </div>
                   </td>
                   <td className="p-6">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold ${getStatusColor(order.status)}`}>
-                      {order.status}
+                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${order.orderStatus === 'Pending' || order.orderStatus === 'CREATED' || order.orderStatus === 'ORDER_SHARED' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {order.orderStatus}
                     </span>
                   </td>
                   <td className="p-6 text-right">
@@ -192,18 +215,18 @@ export default function OrdersPage() {
                       >
                         <Eye size={18} />
                       </button>
-                      {order.status === 'Pending' && (
+                      {(order.orderStatus === 'Pending' || order.orderStatus === 'CREATED' || order.orderStatus === 'ORDER_SHARED') && (
                         <>
-                          <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Accept">
+                          <button onClick={() => updateOrderStatus(order._id || order.id, 'ACCEPTED')} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Accept">
                             <Check size={18} />
                           </button>
-                          <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Reject">
+                          <button onClick={() => updateOrderStatus(order._id || order.id, 'CANCELLED')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Reject / Cancel">
                             <X size={18} />
                           </button>
                         </>
                       )}
-                      {order.status === 'Accepted' && (
-                        <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Mark as Packed">
+                      {order.orderStatus === 'ACCEPTED' && (
+                        <button onClick={() => updateOrderStatus(order._id || order.id, 'PACKED')} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Mark as Packed">
                           <PackageCheck size={18} />
                         </button>
                       )}
@@ -225,18 +248,25 @@ export default function OrdersPage() {
                 <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
                 <p className="text-sm text-gray-500 mt-1">ID: {selectedOrder.orderId}</p>
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                <X size={20} className="text-gray-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedOrder.orderStatus !== 'CANCELLED' && selectedOrder.orderStatus !== 'DELIVERED' && selectedOrder.orderStatus !== 'COMPLETED' && (
+                  <button onClick={() => updateOrderStatus(selectedOrder._id || selectedOrder.id, 'CANCELLED')} className="px-3 py-1.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                    Cancel Order
+                  </button>
+                )}
+                <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">
               <div className="mb-6">
                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Customer Information</h4>
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="font-semibold text-gray-900">{selectedOrder.customerName}</p>
-                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2"><Phone size={14}/> {selectedOrder.customerPhone}</p>
-                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2"><MapPin size={14}/> {typeof selectedOrder.deliveryAddress === 'string' ? selectedOrder.deliveryAddress : 'Delivery Address hidden'}</p>
+                  <p className="font-semibold text-gray-900">{selectedOrder.customerId?.name || selectedOrder.customerName || 'Guest'}</p>
+                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2"><Phone size={14}/> {selectedOrder.customerId?.username || selectedOrder.customerPhone || 'N/A'}</p>
+                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2"><MapPin size={14}/> {typeof selectedOrder.deliveryAddress === 'string' && selectedOrder.deliveryAddress ? selectedOrder.deliveryAddress : 'No Address Provided'}</p>
                 </div>
               </div>
 
@@ -246,7 +276,16 @@ export default function OrdersPage() {
                   {selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items.map((item: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
                       <div className="flex items-center gap-3">
-                        <img src={item.image} alt={item.name} className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100" />
+                        {(() => {
+                          const itemImgUrl = item.itemId?.img?.url || item.itemId?.product?.img?.url || item.itemId?.product?.productImage?.[0]?.url || item.image;
+                          return itemImgUrl ? (
+                            <img src={itemImgUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100 shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                               <PackageCheck size={20} className="text-indigo-400" />
+                            </div>
+                          );
+                        })()}
                         <div>
                           <p className="font-semibold text-gray-900">{item.name}</p>
                           <p className="text-xs text-gray-500">₹{item.price} × {item.quantity}</p>
@@ -264,59 +303,65 @@ export default function OrdersPage() {
             </div>
 
             <div className="p-6 border-t border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between mb-2 text-sm text-gray-600">
-                <span>Total Items Value</span>
-                <span>₹{selectedOrder.totalAmount + (selectedOrder.coinDiscount || 0)}</span>
+              <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Financial Breakdown</h4>
+              <div className="space-y-2 text-sm text-gray-600 mb-4">
+                <div className="flex items-center justify-between">
+                  <span>Items Subtotal</span>
+                  <span className="font-semibold text-gray-900">₹{selectedOrder.subtotalAmount || (selectedOrder.totalAmount + (selectedOrder.coinDiscount || 0))}</span>
+                </div>
+                
+                <div className="flex items-center justify-between text-yellow-600">
+                  <span>Coin Discount Used</span>
+                  <span className="font-medium">-₹{selectedOrder.coinDiscount || 0}</span>
+                </div>
+                
+                <div className="flex items-center justify-between text-red-600">
+                  <span>Pasr Commission</span>
+                  <span className="font-medium">-₹{selectedOrder.pasrCommission || 0}</span>
+                </div>
+                
+                <div className="h-px bg-gray-200 my-2"></div>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <span className="font-bold text-gray-900">Amount to Collect (Customer Pays)</span>
+                  <span className="text-xl font-extrabold text-indigo-600">₹{selectedOrder.totalAmount}</span>
+                </div>
+                
+                <div className="flex items-center justify-between mt-1">
+                  <span className="font-bold text-gray-900">Net Shop Earnings</span>
+                  <span className="text-xl font-extrabold text-emerald-600">₹{selectedOrder.totalAmount + (selectedOrder.coinDiscount || 0) - (selectedOrder.pasrCommission || 0)}</span>
+                </div>
               </div>
               
-              {selectedOrder.selfDelivery ? (
-                // Self Pickup Flow
-                <>
-                  <div className="flex items-center justify-between mb-2 text-sm text-yellow-600 font-medium">
-                    <span>Coin Discount (Pasr will pay you)</span>
-                    <span>-₹{selectedOrder.coinDiscount || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Price to Take (from Customer)</span>
-                    <span className="text-2xl font-extrabold text-indigo-600">₹{selectedOrder.totalAmount}</span>
-                  </div>
+              {!(selectedOrder.deliveryType?.toLowerCase().includes('self') || selectedOrder.deliveryType === 'SHOP_PICKUP' || selectedOrder.selfDelivery) && (
+                <div className="mt-4 text-center">
+                  <span className="inline-flex w-full justify-center px-4 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 uppercase tracking-wider">
+                    {selectedOrder.paymentType === 'COD' ? `Delivery Partner Will Collect ₹${selectedOrder.totalAmount}` : `PAID ONLINE VIA ${selectedOrder.paymentType}`}
+                  </span>
+                </div>
+              )}
 
-                  {(selectedOrder.status === 'Pending' || selectedOrder.status === 'CREATED') && (
-                    <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Customer OTP</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          maxLength={4}
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="Enter 4-digit OTP" 
-                          className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-lg tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <button 
-                          onClick={verifyOtp}
-                          disabled={verifying || otp.length < 4}
-                          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {verifying ? <Loader2 size={20} className="animate-spin" /> : 'Complete Order'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                // Delivery Flow
-                <>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Price Pasr Will Pay You</span>
-                    <span className="text-2xl font-extrabold text-emerald-600">₹{selectedOrder.totalAmount + (selectedOrder.coinDiscount || 0)}</span>
+              {(selectedOrder.deliveryType?.toLowerCase().includes('self') || selectedOrder.deliveryType === 'SHOP_PICKUP' || selectedOrder.selfDelivery) && (selectedOrder.orderStatus === 'Pending' || selectedOrder.orderStatus === 'CREATED' || selectedOrder.orderStatus === 'ORDER_SHARED' || selectedOrder.status === 'Pending') && (
+                <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Customer OTP</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      maxLength={4}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="Enter 4-digit OTP" 
+                      className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-lg tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button 
+                      onClick={verifyOtp}
+                      disabled={verifying || otp.length < 4}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {verifying ? <Loader2 size={20} className="animate-spin" /> : 'Complete Order'}
+                    </button>
                   </div>
-                  <div className="mt-4">
-                    <span className="inline-flex w-full justify-center px-4 py-2 rounded-xl text-sm font-bold bg-amber-50 text-amber-700 uppercase tracking-wider">
-                      {selectedOrder.paymentType === 'COD' ? 'Delivery Partner Will Collect Cash' : `PAID ONLINE VIA ${selectedOrder.paymentType}`}
-                    </span>
-                  </div>
-                </>
+                </div>
               )}
             </div>
           </div>

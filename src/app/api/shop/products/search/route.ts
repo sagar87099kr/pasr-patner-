@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const cookieStore = await cookies();
     const userId = cookieStore.get('pasr_token')?.value;
 
-    const backendUrl = `https://www.pasr.in/api/shop/products/search?q=${encodeURIComponent(query)}`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/products/search?q=${encodeURIComponent(query)}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',

@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/products?shopId=${activeShopId}`;
+    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:8080'}/api/shop/settings?shopId=${activeShopId}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
@@ -37,12 +37,12 @@ export async function GET() {
     return NextResponse.json(data);
 
   } catch (error: any) {
-    console.error('Error fetching shop products:', error);
+    console.error('Error fetching shop settings:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function PUT(req: Request) {
   try {
     const cookieStore = await cookies();
     const activeShopId = cookieStore.get('active_shop_id')?.value;
@@ -53,14 +53,12 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/products`;
+    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:8080'}/api/shop/settings`;
     
-    // Pass shopId inside the payload to the backend
     const payload = { ...body, shopId: activeShopId };
 
     const backendRes = await fetch(backendUrl, {
-      method: 'POST',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${userId || ''}`,
@@ -84,7 +82,7 @@ export async function POST(req: Request) {
     return NextResponse.json(data);
 
   } catch (error: any) {
-    console.error('Error adding product:', error);
-    return NextResponse.json({ error: 'Failed to add product' }, { status: 500 });
+    console.error('Error updating shop settings:', error);
+    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }
 }

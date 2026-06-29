@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-export async function GET() {
+export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
     const activeShopId = cookieStore.get('active_shop_id')?.value;
@@ -11,15 +11,23 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/orders?shopId=${activeShopId}`;
-    
+    const body = await req.json();
+
+    // Attach the active shop ID to the payload to prevent tampering
+    const payload = { ...body, shopId: activeShopId };
+
+    // Since this is a new local-only endpoint for testing, we point to localhost:8080
+    // Once deployed, you should change this back to process.env.BACKEND_URL
+    const backendUrl = `http://localhost:8080/api/shop/billing`;
+
     const backendRes = await fetch(backendUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${userId || ''}`,
         'Cookie': `pasr_token=${userId || ''}; active_shop_id=${activeShopId}`
-      }
+      },
+      body: JSON.stringify(payload)
     });
 
     const responseText = await backendRes.text();
@@ -27,19 +35,16 @@ export async function GET() {
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      // If not JSON, return as is or error
-      return NextResponse.json({ error: 'Invalid response from backend' }, { status: 500 });
+      return NextResponse.json({ error: 'Invalid response from backend', details: responseText }, { status: 500 });
     }
 
     if (!backendRes.ok) {
       return NextResponse.json(data, { status: backendRes.status });
     }
 
-    // Return the backend data directly, assuming the backend formats it correctly
     return NextResponse.json(data);
-
   } catch (error: any) {
-    console.error('Error fetching shop orders:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Error generating bill:', error);
+    return NextResponse.json({ error: 'Failed to generate bill', message: error.message }, { status: 500 });
   }
 }

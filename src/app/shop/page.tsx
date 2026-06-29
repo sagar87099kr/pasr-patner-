@@ -15,14 +15,16 @@ export default function ShopDashboard() {
   const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [productsRes, ordersRes] = await Promise.all([
+        const [productsRes, ordersRes, dashboardRes] = await Promise.all([
           fetch('/api/shop/products'),
-          fetch('/api/shop/orders')
+          fetch('/api/shop/orders'),
+          fetch('/api/shop/dashboard')
         ]);
         
         if (productsRes.ok) {
@@ -33,6 +35,11 @@ export default function ShopDashboard() {
         if (ordersRes.ok) {
           const oData = await ordersRes.json();
           setOrders(oData.orders || []);
+        }
+
+        if (dashboardRes.ok) {
+          const dData = await dashboardRes.json();
+          setDashboard(dData.dashboard || null);
         }
       } catch (e) {
         console.error('Failed to fetch dashboard data', e);
@@ -58,7 +65,7 @@ export default function ShopDashboard() {
   }, 0);
 
   const metrics = [
-    { title: "Total Orders", value: loading ? "..." : totalOrders.toString(), icon: ShoppingCart, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" },
+    { title: "Total Orders", value: loading ? "..." : (dashboard?.totalOrders ?? totalOrders).toString(), icon: ShoppingCart, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" },
     { 
       title: "New Orders", 
       value: loading ? "..." : newOrders.length.toString(), 
@@ -139,23 +146,27 @@ export default function ShopDashboard() {
                 </tr>
               ) : (
                 products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={product._id || product.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="p-6">
                       <div className="flex items-center gap-4">
-                        <img src={product.image} alt={product.name} className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
+                        <img src={product.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'} alt={product.name || product.product?.productName} className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
                         <div>
-                          <p className="font-bold text-gray-900">{product.name}</p>
-                          <p className="flex items-center text-xs text-gray-500 mt-1 gap-1"><MapPin size={12} /> {product.loc}</p>
+                          <p className="font-bold text-gray-900">{product.name || product.product?.productName}</p>
+                          <p className="flex items-center text-xs text-gray-500 mt-1 gap-1"><MapPin size={12} /> {product.loc || 'In Stock'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="p-6">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600">
-                        <Tag size={12} /> {product.category}
+                        <Tag size={12} /> {product.itemCategory || product.product?.categories || product.category || 'General'}
                       </span>
                     </td>
                     <td className="p-6 font-bold text-gray-900">₹{product.price}</td>
-                    <td className="p-6 font-semibold text-gray-700">{product.qty} units</td>
+                    <td className="p-6">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${product.isActive !== false ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                        {product.isActive !== false ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    </td>
                   </tr>
                 ))
               )}
