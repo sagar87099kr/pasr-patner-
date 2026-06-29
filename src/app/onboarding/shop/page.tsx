@@ -64,17 +64,11 @@ export default function ShopRegistration() {
         window.location.href = '/shop';
       } else {
         const data = await res.json();
-        setError(data.error || 'Registration failed.');
+        setError(data.error || data.message || 'Registration failed.');
       }
     } catch (err) {
-      // In a real scenario we use actual API. Here we just mock success to move them forward.
-      console.log("Mocking successful registration due to API endpoint absence in test env");
-      await fetch('/api/auth/set-active-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: 'mock_shop_id', profileType: 'Shop Owner' })
-      });
-      window.location.href = '/shop';
+      setError('An error occurred during registration. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }

@@ -90,16 +90,11 @@ export default function DeliveryRegistration() {
         window.location.href = '/delivery';
       } else {
         const data = await res.json();
-        setError(data.error || 'Registration failed.');
+        setError(data.error || data.message || 'Registration failed.');
       }
     } catch (err) {
-      console.log("Mocking successful registration due to API endpoint absence in test env");
-      await fetch('/api/auth/set-active-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: 'mock_delivery_id', profileType: 'Delivery Partner' })
-      });
-      window.location.href = '/delivery';
+      setError('An error occurred during registration. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }

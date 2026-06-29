@@ -56,16 +56,11 @@ export default function FarmerRegistration() {
         window.location.href = '/farmer';
       } else {
         const data = await res.json();
-        setError(data.error || 'Registration failed.');
+        setError(data.error || data.message || 'Registration failed.');
       }
     } catch (err) {
-      console.log("Mocking successful registration due to API endpoint absence in test env");
-      await fetch('/api/auth/set-active-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: 'mock_farmer_id', profileType: 'Farmer' })
-      });
-      window.location.href = '/farmer';
+      setError('An error occurred during registration. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
