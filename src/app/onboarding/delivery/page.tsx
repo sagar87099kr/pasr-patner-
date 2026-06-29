@@ -68,14 +68,31 @@ export default function DeliveryRegistration() {
       setError('Driving license is required if you are using a motorized vehicle.');
       return;
     }
+    if (!imagePreview || !aadhaarImagePreview) {
+      setError('Profile selfie and Aadhaar card photos are required.');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
+      const payload = {
+        fullName: formData.fullName,
+        phoneNumber: formData.phoneNumber,
+        vehicleType: formData.vehicleType,
+        vehicleNumber: formData.drivingLicense || "N/A",
+        address: formData.location,
+        aadharNumber: formData.aadhaar,
+        panNumber: "0000",
+        dateOfBirth: "1990-01-01",
+        profileImage: imagePreview,
+        aadhaarImage: aadhaarImagePreview
+      };
+
       const res = await fetch('/api/auth/register-delivery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, profileImage: imagePreview, aadhaarImage: aadhaarImagePreview })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {

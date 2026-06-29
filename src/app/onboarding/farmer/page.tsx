@@ -9,7 +9,9 @@ export default function FarmerRegistration() {
     location: '',
     phoneNumber: '',
     category: '',
-    upiId: ''
+    upiId: '',
+    price: '',
+    quantity: ''
   });
   
   const [imagePreview, setImagePreview] = useState('');
@@ -34,6 +36,10 @@ export default function FarmerRegistration() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imagePreview) {
+      setError('Farm image is required.');
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -117,6 +123,17 @@ export default function FarmerRegistration() {
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input required type="text" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 font-medium" placeholder="Village or Full Address" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Price (₹) <span className="text-red-500">*</span></label>
+                  <input required type="number" min="1" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 font-medium" placeholder="Enter price per unit" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Quantity Available <span className="text-red-500">*</span></label>
+                  <input required type="number" min="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 font-medium" placeholder="e.g. 50" />
                 </div>
               </div>
             </div>

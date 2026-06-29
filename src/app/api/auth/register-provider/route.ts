@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:8080'}/api/partner/register-provider`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/register-provider`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'POST',

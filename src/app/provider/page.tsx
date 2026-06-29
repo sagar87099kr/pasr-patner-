@@ -14,14 +14,14 @@ export default function ProviderDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Total Bookings</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">124</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600">
               <CalendarCheck size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
-            <TrendingUp size={16} /> +12% from last month
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
+            No data yet
           </p>
         </div>
 
@@ -29,13 +29,13 @@ export default function ProviderDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Pending Requests</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">8</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-amber-50 p-3 rounded-xl text-amber-600">
               <Clock size={24} />
             </div>
           </div>
-          <p className="text-amber-600 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Requires your attention
           </p>
         </div>
@@ -44,13 +44,13 @@ export default function ProviderDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Completed Jobs</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">110</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600">
               <CheckCircle size={24} />
             </div>
           </div>
-          <p className="text-gray-500 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Across all services
           </p>
         </div>
@@ -59,14 +59,14 @@ export default function ProviderDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Total Earnings</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹45,200</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹0</h3>
             </div>
             <div className="bg-green-50 p-3 rounded-xl text-green-600">
               <DollarSign size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
-            <TrendingUp size={16} /> +8% from last month
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
+            No data yet
           </p>
         </div>
       </div>

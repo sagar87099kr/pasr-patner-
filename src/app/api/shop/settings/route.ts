@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:8080'}/api/shop/settings?shopId=${activeShopId}`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/settings?shopId=${activeShopId}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
@@ -53,7 +53,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const backendUrl = `${process.env.BACKEND_URL || 'http://localhost:8080'}/api/shop/settings`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/settings`;
     
     const payload = { ...body, shopId: activeShopId };
 

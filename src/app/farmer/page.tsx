@@ -14,14 +14,14 @@ export default function FarmerDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Total Orders</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">45</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-green-50 p-3 rounded-xl text-green-600">
               <ShoppingCart size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
-            <TrendingUp size={16} /> +5% from last week
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
+            No data yet
           </p>
         </div>
 
@@ -29,13 +29,13 @@ export default function FarmerDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Produce Listed</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">12</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600">
               <Sprout size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Active crops available
           </p>
         </div>
@@ -44,13 +44,13 @@ export default function FarmerDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Pending Pickups</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">3</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-amber-50 p-3 rounded-xl text-amber-600">
               <Truck size={24} />
             </div>
           </div>
-          <p className="text-amber-600 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Waiting for delivery partner
           </p>
         </div>
@@ -59,14 +59,14 @@ export default function FarmerDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹28,500</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹0</h3>
             </div>
             <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
               <DollarSign size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
-            <TrendingUp size={16} /> +15% from last month
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
+            No data yet
           </p>
         </div>
       </div>

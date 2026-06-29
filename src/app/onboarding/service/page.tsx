@@ -35,14 +35,28 @@ export default function ProviderRegistration() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imagePreview) {
+      setError('Profile image is required.');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
+      const payload = {
+        company: formData.companyName,
+        categories: formData.category,
+        location: formData.location,
+        experience: parseInt(formData.experience) || 1,
+        discription: '',
+        price: [0],
+        personImage: imagePreview
+      };
+
       const res = await fetch('/api/auth/register-provider', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, profileImage: imagePreview })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {

@@ -42,6 +42,7 @@ const roleConfig = {
       { name: 'Dashboard', href: '/provider', icon: LayoutDashboard },
       { name: 'Bookings', href: '/provider/bookings', icon: CalendarCheck },
       { name: 'Services', href: '/provider/services', icon: Package },
+      { name: 'Schedule', href: '/provider/schedule', icon: CalendarCheck },
       { name: 'Settings', href: '/provider/settings', icon: Settings },
     ]
   },

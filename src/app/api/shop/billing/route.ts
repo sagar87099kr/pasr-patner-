@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     // Since this is a new local-only endpoint for testing, we point to localhost:8080
     // Once deployed, you should change this back to process.env.BACKEND_URL
-    const backendUrl = `http://localhost:8080/api/shop/billing`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/billing`;
 
     const backendRes = await fetch(backendUrl, {
       method: 'POST',

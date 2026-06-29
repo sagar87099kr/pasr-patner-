@@ -15,7 +15,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { status } = await req.json();
 
     // Force using local backend for testing since this endpoint is not deployed yet
-    const backendUrl = `http://localhost:8080/api/shop/orders/${id}/status`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/orders/${id}/status`;
     
     // Pass shopId inside the payload to the backend
     const payload = { status, shopId: activeShopId };

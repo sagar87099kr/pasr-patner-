@@ -16,7 +16,7 @@ export default async function ProviderLayout({
     const userId = cookieStore.get('pasr_token')?.value;
     
     if (activeProviderId && userId) {
-      const backendUrl = `https://www.pasr.in/api/partner/my-profiles`;
+      const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/my-profiles`;
       const res = await fetch(backendUrl, {
         headers: {
           'Authorization': `Bearer ${userId}`,

@@ -14,13 +14,13 @@ export default function DeliveryDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Completed Trips</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">12</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600">
               <CheckCircle size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Today
           </p>
         </div>
@@ -29,13 +29,13 @@ export default function DeliveryDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Active Deliveries</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">2</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0</h3>
             </div>
             <div className="bg-amber-50 p-3 rounded-xl text-amber-600">
               <Truck size={24} />
             </div>
           </div>
-          <p className="text-amber-600 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Currently in progress
           </p>
         </div>
@@ -44,13 +44,13 @@ export default function DeliveryDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Online Hours</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">4.5h</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">0h</h3>
             </div>
             <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
               <Clock size={24} />
             </div>
           </div>
-          <p className="text-gray-500 text-sm font-medium mt-4 flex items-center gap-1">
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
             Active time today
           </p>
         </div>
@@ -59,14 +59,14 @@ export default function DeliveryDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-sm font-medium">Today's Earnings</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹850</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹0</h3>
             </div>
             <div className="bg-green-50 p-3 rounded-xl text-green-600">
               <DollarSign size={24} />
             </div>
           </div>
-          <p className="text-emerald-600 text-sm font-medium mt-4 flex items-center gap-1">
-            <TrendingUp size={16} /> +12% from yesterday
+          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
+            No data yet
           </p>
         </div>
       </div>

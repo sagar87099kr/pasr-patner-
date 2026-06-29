@@ -40,6 +40,10 @@ export default function ShopRegistration() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!imagePreview) {
+      setError('Shop image is required.');
+      return;
+    }
     setLoading(true);
     setError('');
 
