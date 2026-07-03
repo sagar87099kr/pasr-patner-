@@ -134,10 +134,14 @@ export default function ProductsPage() {
     }
     setAddingProduct(true);
     try {
+      const payload = {
+        ...newProduct,
+        discountPercent: newProduct.offer || 0
+      };
       const res = await fetch('/api/shop/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProduct)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok) {
@@ -148,6 +152,8 @@ export default function ProductsPage() {
             price: data.product.price,
             qty: data.product.quantity,
             category: newProduct.category,
+            description: newProduct.description,
+            discount: data.product.discount,
             loc: '-',
             image: newProduct.image || '/placeholder.png'
           },
