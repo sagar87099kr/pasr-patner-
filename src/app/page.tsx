@@ -21,16 +21,24 @@ export default function PartnerLogin() {
         body: JSON.stringify({ mobile, password })
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
 
       if (response.ok) {
         window.location.href = '/select-profile';
       } else {
-        setError(data.error || 'Login failed');
+        setError(data.error || data.message || 'Login failed');
         setLoading(false);
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred. Please try again.');
       setLoading(false);
     }
   };

@@ -12,18 +12,23 @@ export async function POST(req: Request) {
 
     const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/register-provider`;
     
+    const bodyText = await req.text();
     const backendRes = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('Content-Type') || 'application/json',
         'Authorization': `Bearer ${userId}`
       },
-      body: req.body,
-      // @ts-ignore
-      duplex: 'half'
+      body: bodyText
     });
 
-    const data = await backendRes.json();
+    let data;
+    const resText = await backendRes.text();
+    try {
+      data = JSON.parse(resText);
+    } catch(e) {
+      data = { error: 'Invalid response from backend' };
+    }
     if (!backendRes.ok) {
       return NextResponse.json(data, { status: backendRes.status });
     }

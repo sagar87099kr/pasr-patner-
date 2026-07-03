@@ -8,6 +8,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mobile and password are required' }, { status: 400 });
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const backendRes = await fetch(`${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/auth/login`, {
       method: 'POST',
       headers: {
@@ -19,7 +22,10 @@ export async function POST(request: Request) {
         username: mobile, // The backend expects 'username'
         password: password,
       }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     const responseText = await backendRes.text();
     let data;

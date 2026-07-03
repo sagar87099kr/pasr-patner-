@@ -152,6 +152,20 @@ export default function ShopRegistration() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">UPI ID <span className="text-red-500">*</span></label>
                   <input required type="text" value={formData.upiId} onChange={e => setFormData({...formData, upiId: e.target.value})} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 font-medium" placeholder="number@upi" />
+                  
+                  {formData.upiId.length > 4 && formData.upiId.includes('@') && (
+                    <div className="mt-4 p-4 border border-gray-200 rounded-xl bg-gray-50 flex flex-col items-center transition-all animate-in fade-in zoom-in duration-300">
+                      <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">Verify Your QR Code</p>
+                      <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-200">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${formData.upiId}&pn=${formData.shopName || 'Shop Owner'}`)}`} 
+                          alt="UPI QR Code" 
+                          className="w-28 h-28"
+                        />
+                      </div>
+                      <p className="text-xs text-indigo-600 font-medium mt-3 text-center">Scan with any UPI app to confirm your details.</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">GST Number <span className="text-gray-400 font-normal">(Optional)</span></label>
