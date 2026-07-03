@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Store, MapPin, Clock, FileText, Upload } from 'lucide-react';
+import { SHOP_CATEGORIES } from '@/lib/categories';
 
 export default function ShopRegistration() {
   const [formData, setFormData] = useState({
@@ -19,13 +20,7 @@ export default function ShopRegistration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const categories = [
-    'Automobile', 'Bakery', 'Beauty/Cosmetics', 'Coaching', 'Dhaba', 'Electronics',
-    'Fashion', 'Footwear', 'Furniture', 'General Store', 'Grocery', 'Hardware',
-    'Jewelers', 'Medical', 'Mobile Shop', 'Non-Veg', 'Printing & Digital',
-    'Restaurant', 'Salon', 'Seeds & Fertilizers', 'Sports', 'Stationery',
-    'Sweet Shop', 'Vegetables & Fruits', 'Wholesale', 'Others'
-  ];
+  const categories = Object.keys(SHOP_CATEGORIES);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

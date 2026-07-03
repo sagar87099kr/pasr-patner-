@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Save, Store, MapPin, Clock, FileText, IndianRupee } from 'lucide-react';
+import { SHOP_CATEGORIES } from '@/lib/categories';
 
 export default function ShopSettings() {
   const [loading, setLoading] = useState(false);
@@ -113,10 +114,10 @@ export default function ShopSettings() {
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Category *</label>
               <select name="category" value={settings.category} onChange={handleChange} required className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-3 outline-none transition-all">
-                <option value="Grocery">Grocery</option>
-                <option value="General Store">General Store</option>
-                <option value="Hardware">Hardware</option>
-                <option value="Automobile">Automobile</option>
+                <option value="" disabled>Select Category</option>
+                {Object.keys(SHOP_CATEGORIES).map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -9,6 +9,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [shopCategory, setShopCategory] = useState<string>('General Store');
+  const [filterCategory, setFilterCategory] = useState('');
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
@@ -127,8 +128,8 @@ export default function ProductsPage() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProduct.productId) {
-      alert('Please select an item from the recommended items list first.');
+    if (!newProduct.productId && !newProduct.name) {
+      alert('Please provide a product name or select from the recommended items list.');
       return;
     }
     setAddingProduct(true);
@@ -222,7 +223,12 @@ export default function ProductsPage() {
     }
   };
 
-  const filteredProducts = products.filter(p => (p.name || p.product?.name || p.product?.productName || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = (p.name || p.product?.name || p.product?.productName || '').toLowerCase().includes(search.toLowerCase());
+    const itemCat = p.itemCategory || p.product?.category || p.product?.categories || p.category;
+    const matchesCategory = filterCategory === '' || itemCat === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
   return (
@@ -253,10 +259,16 @@ export default function ProductsPage() {
               className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl pl-12 pr-4 py-3 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
             />
           </div>
-          <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 px-4 py-3 outline-none">
+          <select 
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 px-4 py-3 outline-none"
+          >
             <option value="">All Categories</option>
-            <option value="Grocery">Grocery</option>
-            <option value="Snacks">Snacks</option>
+            {(SHOP_CATEGORIES[shopCategory as keyof typeof SHOP_CATEGORIES] || SHOP_CATEGORIES['General Store']).map((cat) => (
+              <option key={cat.name} value={cat.name}>{cat.name}</option>
+            ))}
+            <option value="Other">Other</option>
           </select>
         </div>
 
