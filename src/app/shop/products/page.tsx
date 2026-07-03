@@ -28,7 +28,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchShopProfile = async () => {
       try {
-        const res = await fetch('/api/shop/profile');
+        const res = await fetch('/api/shop/profile', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.profile?.category) {
@@ -45,7 +45,7 @@ export default function ProductsPage() {
 
     const fetchProducts = async () => {
       try {
-        const res = await fetch('/api/shop/products');
+        const res = await fetch('/api/shop/products', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           setProducts(data.products || []);

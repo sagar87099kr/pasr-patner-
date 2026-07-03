@@ -22,7 +22,7 @@ export default function ShopSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/shop/settings');
+        const res = await fetch('/api/shop/settings', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.shop) {
