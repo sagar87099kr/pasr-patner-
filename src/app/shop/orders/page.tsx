@@ -62,7 +62,7 @@ export default function OrdersPage() {
       const res = await fetch('/api/shop/orders/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: selectedOrder.id, otp })
+        body: JSON.stringify({ orderId: selectedOrder._id || selectedOrder.id, otp: String(otp).trim() })
       });
       const data = await res.json();
       if (res.ok) {

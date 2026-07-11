@@ -31,10 +31,10 @@ export async function GET() {
     }
 
     if (!backendRes.ok) {
-      return NextResponse.json(data, { status: backendRes.status });
+      return NextResponse.json({ ...data, activeShopId }, { status: backendRes.status });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, activeShopId });
 
   } catch (error: any) {
     console.error('Error fetching shop settings:', error);

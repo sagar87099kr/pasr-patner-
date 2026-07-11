@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function PartnerDashboard() {
   const [partnerData, setPartnerData] = useState<any>(null);
@@ -41,6 +42,21 @@ export default function PartnerDashboard() {
     };
     fetchLiveData();
   }, []);
+
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const downloadQRCode = () => {
+    const canvas = qrRef.current?.querySelector('canvas');
+    if (canvas) {
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${partnerData?.name || 'shop'}-qr-code.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -122,16 +138,38 @@ export default function PartnerDashboard() {
             {/* Profile Section */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Your Profile</h3>
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center text-4xl">
-                  🏪
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex items-center gap-6 flex-1">
+                  <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center text-4xl">
+                    🏪
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold">{partnerData.name}</h4>
+                    <p className="text-gray-500">{partnerData.type}</p>
+                    <p className="text-sm text-green-600 font-semibold mt-1">✓ Verified Provider</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xl font-bold">{partnerData.name}</h4>
-                  <p className="text-gray-500">{partnerData.type}</p>
-                  <p className="text-sm text-green-600 font-semibold mt-1">✓ Verified Provider</p>
+                
+                {/* QR Code Section */}
+                <div className="flex flex-col items-center p-4 border border-gray-200 rounded-xl bg-gray-50">
+                  <p className="text-sm font-bold text-gray-700 mb-2">Shop QR Code</p>
+                  <div ref={qrRef} className="p-2 bg-white rounded-lg shadow-sm">
+                    <QRCodeCanvas 
+                      value={`https://pasr.in/shop/${partnerData.activeShopId || 'demo-shop'}`} 
+                      size={120}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <button 
+                    onClick={downloadQRCode}
+                    className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    Download QR
+                  </button>
                 </div>
-                <div className="ml-auto">
+
+                <div className="ml-auto mt-4 md:mt-0">
                    <button className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold rounded-lg transition-colors">
                      Edit Profile
                    </button>

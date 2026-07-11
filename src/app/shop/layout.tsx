@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar';
+import ShopProfileModal from '@/components/ShopProfileModal';
 import { Bell, Search, User } from 'lucide-react';
 import { cookies } from 'next/headers';
 
@@ -9,10 +10,11 @@ export default async function ShopLayout({
 }) {
   let shopName = "My Shop";
   let shopImage = "";
+  let activeShopId = "";
 
   try {
     const cookieStore = await cookies();
-    const activeShopId = cookieStore.get('active_shop_id')?.value;
+    activeShopId = cookieStore.get('active_shop_id')?.value || "";
     const userId = cookieStore.get('pasr_token')?.value;
     
     if (activeShopId && userId) {
@@ -63,19 +65,11 @@ export default async function ShopLayout({
             
             <div className="h-8 w-px bg-gray-200 mx-2"></div>
             
-            <div className="flex items-center gap-3">
-              {shopImage ? (
-                <img src={shopImage} alt={shopName} className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center font-bold shadow-sm">
-                  {shopName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="hidden md:block text-sm">
-                <p className="font-semibold text-gray-900 leading-tight">{shopName}</p>
-                <p className="text-gray-500 text-xs">Shop Owner</p>
-              </div>
-            </div>
+            <ShopProfileModal 
+              shopName={shopName} 
+              shopImage={shopImage} 
+              activeShopId={activeShopId || ''} 
+            />
           </div>
         </header>
 

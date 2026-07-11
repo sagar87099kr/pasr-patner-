@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Save, Store, MapPin, Clock, FileText, IndianRupee } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Save, Store, MapPin, Clock, FileText, IndianRupee, QrCode } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 
 export default function ShopSettings() {
@@ -16,8 +17,24 @@ export default function ShopSettings() {
     openingTime: '',
     closingTime: '',
     upiId: '',
-    gstNumber: ''
+    gstNumber: '',
+    activeShopId: ''
   });
+
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const downloadQRCode = () => {
+    const canvas = qrRef.current?.querySelector('canvas');
+    if (canvas) {
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${settings.shopName || 'shop'}-qr-code.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -34,7 +51,8 @@ export default function ShopSettings() {
               openingTime: data.shop.openingTime || '09:00',
               closingTime: data.shop.closingTime || '21:00',
               upiId: data.shop.upiId || '',
-              gstNumber: data.shop.gstNumber || ''
+              gstNumber: data.shop.gstNumber || '',
+              activeShopId: data.activeShopId || ''
             });
           }
         }
@@ -98,6 +116,36 @@ export default function ShopSettings() {
               <Store size={20} />
             </div>
             <h2 className="text-lg font-bold text-gray-900">Basic Information</h2>
+            
+            {/* Shop QR Code Toggle/Download inside Basic Info Header */}
+            {settings.activeShopId && (
+              <div className="ml-auto flex items-center gap-4 border border-indigo-100 bg-indigo-50/50 p-2 pr-4 rounded-xl">
+                <div ref={qrRef} className="bg-white p-1 rounded-lg shadow-sm">
+                  <QRCodeCanvas 
+                    value={`https://pasr.in/shops/${settings.activeShopId}`} 
+                    size={64}
+                    level="H"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: "/pasr.jpeg",
+                      height: 16,
+                      width: 16,
+                      excavate: true,
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-indigo-900 mb-1">Shop QR</p>
+                  <button 
+                    type="button"
+                    onClick={downloadQRCode}
+                    className="text-xs px-3 py-1.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

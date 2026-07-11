@@ -5,6 +5,7 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     const userId = cookieStore.get('pasr_token')?.value;
+    const activeShopId = cookieStore.get('active_shop_id')?.value;
 
     const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/profile`;
     
@@ -26,10 +27,10 @@ export async function GET() {
     }
 
     if (!backendRes.ok) {
-      return NextResponse.json(data, { status: backendRes.status });
+      return NextResponse.json({ ...data, activeShopId }, { status: backendRes.status });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, activeShopId });
 
   } catch (error: any) {
     console.error("Profile Error:", error);
