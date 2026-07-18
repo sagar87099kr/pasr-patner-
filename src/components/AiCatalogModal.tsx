@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Upload, Loader2, IndianRupee, ImagePlus } from 'lucide-react';
 import Image from 'next/image';
+import { compressImage } from '@/lib/imageCompression';
 
 interface AiCatalogModalProps {
   onClose: () => void;
@@ -24,13 +25,8 @@ export default function AiCatalogModal({ onClose, onSuccess, aiCredits }: AiCata
     }
   };
 
-  const toBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
+  const toBase64 = async (file: File): Promise<string> => {
+    return await compressImage(file, 1);
   };
 
   const handleGenerate = async () => {
@@ -156,7 +152,7 @@ export default function AiCatalogModal({ onClose, onSuccess, aiCredits }: AiCata
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <ImagePlus className="w-10 h-10 text-gray-400 mb-3" />
                   <p className="mb-2 text-sm text-gray-500 font-medium">Click to upload photos</p>
-                  <p className="text-xs text-gray-400">SVG, PNG, JPG (Max 4 files)</p>
+                  <span className="text-xs text-gray-400 mt-2 block">Any image format (auto-compressed). Up to 4 images.</span>
                 </div>
                 <input type="file" className="hidden" multiple accept="image/*" onChange={handleFileChange} />
               </label>

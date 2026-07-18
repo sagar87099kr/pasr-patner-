@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Truck, MapPin, Phone, FileText, Upload, User } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompression';
 
 export default function DeliveryRegistration() {
   const [formData, setFormData] = useState({
@@ -43,25 +44,27 @@ export default function DeliveryRegistration() {
     { label: 'Bicycle', value: 'bicycle' }
   ];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file, 1);
+        setImagePreview(compressedBase64);
+      } catch (err) {
+        console.error("Image compression failed", err);
+      }
     }
   };
 
-  const handleAadhaarImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAadhaarImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAadhaarImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file, 1);
+        setAadhaarImagePreview(compressedBase64);
+      } catch (err) {
+        console.error("Image compression failed", err);
+      }
     }
   };
 
@@ -214,7 +217,7 @@ export default function DeliveryRegistration() {
                     </div>
                   )}
                   <span className="text-sm font-bold text-amber-600">Upload clear selfie/photo</span>
-                  <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                  <span className="text-xs text-gray-500 mt-1">Any image format (auto-compressed)</span>
                 </label>
               </div>
             </div>
@@ -233,7 +236,7 @@ export default function DeliveryRegistration() {
                     </div>
                   )}
                   <span className="text-sm font-bold text-amber-600">Upload Aadhaar photo</span>
-                  <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                  <span className="text-xs text-gray-500 mt-1">Any image format (auto-compressed)</span>
                 </label>
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import { compressImage } from '@/lib/imageCompression';
 import AiCatalogModal from '@/components/AiCatalogModal';
 
 export default function ProductsPage() {
@@ -20,7 +21,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [newProduct, setNewProduct] = useState({ 
-    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', productId: '',
+    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [] as string[], productId: '',
     deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true
   });
   
@@ -121,29 +122,39 @@ export default function ProductsPage() {
     setShowSuggestions(false);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProduct(prev => ({ ...prev, image: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      try {
+        const compressedBase64s: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          compressedBase64s.push(await compressImage(files[i], 1));
+        }
+        setNewProduct(prev => {
+          const allImages = [...(prev.images || []), ...compressedBase64s];
+          return { ...prev, images: allImages, image: allImages[0] };
+        });
+      } catch (err) {
+        console.error("Image compression failed", err);
+      }
     }
   };
 
-  const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('File size should be less than 2MB');
-        return;
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      try {
+        const compressedBase64s: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          compressedBase64s.push(await compressImage(files[i], 1));
+        }
+        setEditingProduct((prev: any) => {
+          const allImages = [...(prev.images || []), ...compressedBase64s];
+          return { ...prev, images: allImages, image: allImages[0] };
+        });
+      } catch (err) {
+        console.error("Image compression failed", err);
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditingProduct((prev: any) => ({ ...prev, image: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -176,12 +187,13 @@ export default function ProductsPage() {
             description: newProduct.description,
             discount: data.product.discount,
             loc: '-',
-            image: newProduct.image || '/placeholder.png'
+            image: newProduct.image || '/placeholder.png',
+            images: newProduct.images && newProduct.images.length > 0 ? newProduct.images : (newProduct.image ? [newProduct.image] : [])
           },
           ...prev
         ]);
         setShowAddModal(false);
-        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', productId: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
+        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [], productId: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
         alert('Product added successfully!');
       } else {
         alert(data.error || 'Failed to add product');
@@ -219,7 +231,8 @@ export default function ProductsPage() {
         name: editingProduct.name,
         category: editingProduct.category,
         description: editingProduct.description,
-        image: editingProduct.image
+        image: editingProduct.image,
+        images: editingProduct.images || (editingProduct.extraImages ? [editingProduct.image, ...editingProduct.extraImages] : [editingProduct.image])
       };
       const res = await fetch(`/api/shop/products/${editingProduct._id || editingProduct.id}`, {
         method: 'PUT',
@@ -235,8 +248,9 @@ export default function ProductsPage() {
           name: editingProduct.name,
           itemCategory: editingProduct.category,
           description: editingProduct.description,
-          image: editingProduct.image,
-          img: { url: editingProduct.image || p.img?.url }
+          image: editingProduct.images && editingProduct.images.length > 0 ? editingProduct.images[0] : (editingProduct.image || ''),
+          img: { url: editingProduct.images && editingProduct.images.length > 0 ? editingProduct.images[0] : (editingProduct.image || p.img?.url) },
+          extraImages: editingProduct.images && editingProduct.images.length > 1 ? editingProduct.images.slice(1).map((url: string) => ({ url })) : []
         } : p));
         setShowEditModal(false);
         setEditingProduct(null);
@@ -367,7 +381,8 @@ export default function ProductsPage() {
                           category: product.itemCategory || product.category || product.product?.category || '',
                           description: product.description || product.product?.description || '',
                           discount: product.discount || product.discountPercent || 0,
-                          image: product.img?.url || product.product?.img?.url || product.image || ''
+                          image: product.img?.url || product.product?.img?.url || product.image || '',
+                          images: product.extraImages ? [product.img?.url, ...product.extraImages.map((e: any) => e.url)].filter(Boolean) : (product.img?.url ? [product.img.url] : [])
                         }); 
                         setShowEditModal(true); 
                       }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
@@ -450,22 +465,33 @@ export default function ProductsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Item Image</label>
-                  <div className="flex items-center gap-3 w-full bg-white border border-gray-300 rounded-lg p-2">
-                    {newProduct.image && (
-                      <div className="shrink-0 w-12 h-12 rounded border border-gray-200 overflow-hidden bg-gray-50">
-                        <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Item Images</label>
+                  <div className="flex flex-col gap-3 w-full bg-white border border-gray-300 rounded-lg p-3">
+                    {newProduct.images && newProduct.images.length > 0 && (
+                      <div className="flex gap-2 flex-wrap">
+                        {newProduct.images.map((img, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                            <img src={img} alt="Preview" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => {
+                              const newImages = [...newProduct.images];
+                              newImages.splice(i, 1);
+                              setNewProduct({...newProduct, images: newImages, image: newImages[0] || ''});
+                            }} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"><X className="w-3 h-3" /></button>
+                          </div>
+                        ))}
                       </div>
                     )}
-                    <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
-                      {newProduct.image ? 'Change Image' : 'Choose file'}
-                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                    </label>
-                    {!newProduct.image && (
-                      <span className="text-sm font-bold text-gray-700 truncate flex-1">
-                        No file chosen
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
+                        {newProduct.images && newProduct.images.length > 0 ? 'Add More Images' : 'Choose files'}
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      </label>
+                      {(!newProduct.images || newProduct.images.length === 0) && (
+                        <span className="text-sm font-bold text-gray-700 truncate flex-1">
+                          No files chosen
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -531,22 +557,32 @@ export default function ProductsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Item Image</label>
-                  <div className="flex items-center gap-3 w-full bg-white border border-gray-300 rounded-lg p-2">
-                    {editingProduct.image && (
-                      <div className="shrink-0 w-12 h-12 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Item Images</label>
+                  <div className="flex flex-col gap-3 w-full bg-white border border-gray-300 rounded-lg p-3">
+                    {editingProduct.images && editingProduct.images.length > 0 ? (
+                      <div className="flex gap-2 flex-wrap">
+                        {editingProduct.images.map((img: string, i: number) => (
+                          <div key={i} className="relative w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                            <img src={img} alt="Preview" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => {
+                              const newImages = [...editingProduct.images];
+                              newImages.splice(i, 1);
+                              setEditingProduct({...editingProduct, images: newImages, image: newImages[0] || ''});
+                            }} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg p-0.5"><X className="w-3 h-3" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : editingProduct.image ? (
+                      <div className="relative w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-50">
                         <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
                       </div>
-                    )}
-                    <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
-                      {editingProduct.image ? 'Change Image' : 'Choose file'}
-                      <input type="file" accept="image/*" className="hidden" onChange={handleEditImageUpload} />
-                    </label>
-                    {!editingProduct.image && (
-                      <span className="text-sm font-bold text-gray-700 truncate flex-1">
-                        No file chosen
-                      </span>
-                    )}
+                    ) : null}
+                    <div className="flex items-center gap-3">
+                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
+                        Change/Add Images
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={handleEditImageUpload} />
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -597,10 +633,11 @@ export default function ProductsPage() {
             setNewProduct(prev => ({ 
               ...prev, 
               image: images[0] || '',
+              images: images,
               name: visionData?.title || prev.name,
               description: visionData?.description || prev.description,
               price: visionData?.price || prev.price,
-              discount: visionData?.discount || prev.discount
+              offer: visionData?.discount || prev.offer
             }));
             
             // Clean up

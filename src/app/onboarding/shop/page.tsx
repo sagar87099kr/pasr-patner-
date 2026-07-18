@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Store, MapPin, Clock, FileText, Upload } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompression';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 
 export default function ShopRegistration() {
@@ -22,14 +23,15 @@ export default function ShopRegistration() {
 
   const categories = Object.keys(SHOP_CATEGORIES);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file, 1);
+        setImagePreview(compressedBase64);
+      } catch (err) {
+        console.error("Image compression failed", err);
+      }
     }
   };
 
@@ -186,7 +188,7 @@ export default function ShopRegistration() {
                     </div>
                   )}
                   <span className="text-sm font-bold text-indigo-600">Click to upload shop image</span>
-                  <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                  <span className="text-xs text-gray-500 mt-1">Any image format (auto-compressed)</span>
                 </label>
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Tractor, MapPin, Phone, Upload } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompression';
 
 export default function FarmerRegistration() {
   const [formData, setFormData] = useState({
@@ -23,14 +24,15 @@ export default function FarmerRegistration() {
     'Seeds & Fertilizers', 'Others'
   ];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file, 1);
+        setImagePreview(compressedBase64);
+      } catch (err) {
+        console.error("Image compression failed", err);
+      }
     }
   };
 
@@ -152,7 +154,7 @@ export default function FarmerRegistration() {
                     </div>
                   )}
                   <span className="text-sm font-bold text-green-600">Click to upload your image</span>
-                  <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                  <span className="text-xs text-gray-500 mt-1">Any image format (auto-compressed)</span>
                 </label>
               </div>
             </div>
