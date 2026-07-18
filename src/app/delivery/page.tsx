@@ -121,12 +121,38 @@ export default function DeliveryDashboard() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Delivery Dashboard</h1>
           <p className="text-gray-500 text-sm mt-1">Welcome back, {partner?.fullName || 'Partner'}.</p>
         </div>
-        <div className="flex items-center gap-2">
-           <span className="relative flex h-3 w-3">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${partner?.isActive ? 'bg-green-400' : 'bg-gray-400'}`}></span>
-            <span className={`relative inline-flex rounded-full h-3 w-3 ${partner?.isActive ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/partner/delivery/toggle-status', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ isActive: !partner?.isActive })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  fetchDashboard(); // Refresh to get the new status
+                } else {
+                  alert(data.message || 'Failed to update status');
+                }
+              } catch (e) {
+                alert('An error occurred while updating status');
+              }
+            }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+              partner?.isActive ? 'bg-green-500' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                partner?.isActive ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span className="text-sm font-medium text-gray-700">
+            {partner?.isActive ? 'Online' : 'Offline'}
           </span>
-          <span className="text-sm font-medium text-gray-700">{partner?.isActive ? 'Online' : 'Offline'}</span>
         </div>
       </div>
 

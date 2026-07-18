@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     // Call the backend endpoint
     const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/delivery/dashboard`;
     const backendRes = await fetch(backendUrl, {
+      cache: 'no-store',
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${userId}`,
