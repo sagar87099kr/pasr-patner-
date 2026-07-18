@@ -257,7 +257,13 @@ export default function DeliveryDashboard() {
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pickup From</p>
                       <p className="font-medium text-gray-900">{order.shopId?.shopName || order.shopId?.owner?.name || 'Local Shop'}</p>
-                      <p className="text-sm text-gray-500">{order.shopId?.owner?.username}</p>
+                      {order.shopId?.owner?.username && (
+                        <p className="text-sm font-semibold mt-1">
+                          <a href={`tel:${order.shopId.owner.username}`} className="text-indigo-600 hover:underline flex items-center gap-1">
+                            📞 {order.shopId.owner.username}
+                          </a>
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -265,7 +271,14 @@ export default function DeliveryDashboard() {
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Deliver To</p>
                       <p className="font-medium text-gray-900">{order.customerId?.name || 'Customer'}</p>
-                      <p className="text-sm text-gray-500">{order.deliveryAddress}</p>
+                      {order.customerId?.username && (
+                        <p className="text-sm font-semibold mt-1">
+                          <a href={`tel:${order.customerId.username}`} className="text-indigo-600 hover:underline flex items-center gap-1">
+                            📞 {order.customerId.username}
+                          </a>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500 mt-1">{order.deliveryAddress}</p>
                     </div>
                   </div>
                   
