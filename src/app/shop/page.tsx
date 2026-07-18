@@ -17,6 +17,25 @@ export default function ShopDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [requestPayoutLoading, setRequestPayoutLoading] = useState(false);
+
+  const handleRequestPayout = async () => {
+    setRequestPayoutLoading(true);
+    try {
+      const res = await fetch('/api/shop/request-payout', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(data.message || 'Payout requested successfully.');
+        window.location.reload();
+      } else {
+        alert(data.error || data.message || 'Failed to request payout.');
+      }
+    } catch (e) {
+      alert('An error occurred while requesting payout.');
+    } finally {
+      setRequestPayoutLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -181,6 +200,15 @@ export default function ShopDashboard() {
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <CheckCircle2 size={20} className="text-emerald-600" /> Payment History (Pasr Settlements)
           </h2>
+          {paymentToReceive > 0 && (
+            <button 
+              onClick={handleRequestPayout}
+              disabled={requestPayoutLoading}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
+            >
+              {requestPayoutLoading ? 'Requesting...' : 'Request Payout'}
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-left border-collapse relative">
