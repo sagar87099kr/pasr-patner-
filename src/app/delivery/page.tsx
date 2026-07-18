@@ -39,12 +39,16 @@ export default function DeliveryDashboard() {
     if (!orderId) return alert('Enter Order ID');
     if (!otp || otp.length < 4) return alert('Enter a valid 4-digit OTP');
     
+    // Find the real MongoDB _id
+    const targetOrder = activeOrders.find((o: any) => o.orderId === orderId || o._id === orderId);
+    if (!targetOrder) return alert('Order not found in your active deliveries!');
+
     setVerifying(true);
     try {
       const res = await fetch('/api/partner/delivery/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, otp })
+        body: JSON.stringify({ orderId: targetOrder._id, otp })
       });
       const data = await res.json();
       if (res.ok) {

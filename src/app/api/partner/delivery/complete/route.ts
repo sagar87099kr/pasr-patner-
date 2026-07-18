@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         'Authorization': `Bearer ${userId}`,
         'Cookie': `pasr_token=${userId}`
       },
-      body: JSON.stringify({ deliveryOTP: otp })
+      body: JSON.stringify({ otp })
     });
 
     const responseText = await backendRes.text();
