@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/order/${orderId}/picked-up`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/delivery/order/${orderId}/picked-up`;
     const backendRes = await fetch(backendUrl, {
       method: 'POST',
       headers: {

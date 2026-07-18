@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     // Call the backend endpoint
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/orders/${orderId}/complete`;
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/delivery/order/${orderId}/complete`;
     const backendRes = await fetch(backendUrl, {
       method: 'POST',
       headers: {
