@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import AiCatalogModal from '@/components/AiCatalogModal';
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
@@ -12,6 +13,8 @@ export default function ProductsPage() {
   const [filterCategory, setFilterCategory] = useState('');
   
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiCredits, setAiCredits] = useState(0);
   const [addingProduct, setAddingProduct] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
@@ -36,6 +39,11 @@ export default function ProductsPage() {
           } else if (data.profile?.type) {
             setShopCategory(data.profile.type);
           }
+          
+          // Fetch AI Credits (we can fetch it directly from the backend API if we know the active shop ID)
+          // Actually, since we're making a direct API call from the client to the Next.js API, we should have a Next.js wrapper for fetching credits.
+          // For now, let's create a quick fetch to the backend assuming we pass shopId. Or better, just add it to a Next.js route later.
+          // We can fetch credits when opening the modal instead.
         }
       } catch (e) {
         console.error('Failed to fetch shop profile', e);
@@ -58,6 +66,19 @@ export default function ProductsPage() {
     };
     fetchProducts();
   }, []);
+
+  const openAiStudio = async () => {
+    try {
+      const res = await fetch('/api/ai/credits');
+      if (res.ok) {
+        const data = await res.json();
+        setAiCredits(data.credits || 0);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setShowAiModal(true);
+  };
 
   // Autocomplete debounce logic
   useEffect(() => {
@@ -244,12 +265,20 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Products Catalogue</h1>
           <p className="text-gray-500 text-sm mt-1">Manage your inventory, prices, and product details.</p>
         </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-        >
-          <Plus size={20} /> Add New Product
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={openAiStudio}
+            className="bg-black hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            <Sparkles size={20} className="text-yellow-400" /> AI Catalog Studio
+          </button>
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus size={20} /> Add New Product
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -556,6 +585,31 @@ export default function ProductsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showAiModal && (
+        <AiCatalogModal
+          aiCredits={aiCredits}
+          onClose={() => setShowAiModal(false)}
+          onSuccess={(images) => {
+            const visionData = (window as any).__aiVisionData;
+            
+            setNewProduct(prev => ({ 
+              ...prev, 
+              image: images[0] || '',
+              name: visionData?.title || prev.name,
+              description: visionData?.description || prev.description,
+              price: visionData?.price || prev.price,
+              discount: visionData?.discount || prev.discount
+            }));
+            
+            // Clean up
+            (window as any).__aiVisionData = null;
+            
+            setShowAiModal(false);
+            setShowAddModal(true);
+          }}
+        />
       )}
     </div>
   );

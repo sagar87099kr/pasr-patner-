@@ -19,7 +19,7 @@ export default function ProviderRegistration() {
   const categories = [
     'Farming Vehicles', 'Four Wheelers', 'HMV (Bus)', 'Three Wheelers', 
     'Caterings', 'Filming', 'Decoration', 'DJ and Tent', 'Band Party', 
-    'Mistry & Labour', 'Home Service provider', 'Heavy Equipments', 'Others'
+    'Labour and Mistry', 'Home Service provider', 'Heavy Equipments', 'Others'
   ];
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

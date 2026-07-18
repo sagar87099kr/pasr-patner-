@@ -91,15 +91,28 @@ export default function SettingsClient({ initialData, activeProviderId }: { init
                 <Briefcase size={16} className="mr-2 text-indigo-500" />
                 Category
               </label>
-              <input 
-                type="text"
+              <select 
                 name="categories"
                 value={formData.categories}
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                placeholder="e.g. Electrician, Heavy Equipments"
                 required
-              />
+              >
+                <option value="" disabled>Select a category</option>
+                <option value="Farming Vehicles">Farming Vehicles</option>
+                <option value="Four Wheelers">Four Wheelers</option>
+                <option value="HMV (Bus)">HMV (Bus)</option>
+                <option value="Three Wheelers">Three Wheelers</option>
+                <option value="Caterings">Caterings</option>
+                <option value="Filming">Filming</option>
+                <option value="Decoration">Decoration</option>
+                <option value="DJ and Tent">DJ and Tent</option>
+                <option value="Band Party">Band Party</option>
+                <option value="Home Service provider">Home Service provider</option>
+                <option value="Heavy Equipments">Heavy Equipments</option>
+                <option value="Labour and Mistry">Labour and Mistry</option>
+                <option value="Others">Others</option>
+              </select>
             </div>
 
             {/* Experience */}

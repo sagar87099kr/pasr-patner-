@@ -37,7 +37,10 @@ export default function DeliveryRegistration() {
   }, []);
 
   const vehicleTypes = [
-    'Two Wheeler', 'Three Wheeler', 'Four Wheeler', 'Bicycle'
+    { label: 'Two Wheeler', value: 'bike' },
+    { label: 'Three Wheeler', value: 'tempo' },
+    { label: 'Four Wheeler', value: 'four_wheeler' },
+    { label: 'Bicycle', value: 'bicycle' }
   ];
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,7 +67,7 @@ export default function DeliveryRegistration() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.vehicleType !== 'Bicycle' && formData.vehicleType !== '' && !formData.drivingLicense) {
+    if (formData.vehicleType !== 'bicycle' && formData.vehicleType !== '' && !formData.drivingLicense) {
       setError('Driving license is required if you are using a motorized vehicle.');
       return;
     }
@@ -79,7 +82,7 @@ export default function DeliveryRegistration() {
       const payload = {
         fullName: formData.fullName,
         phoneNumber: formData.phoneNumber,
-        vehicleType: formData.vehicleType,
+        vehicleType: formData.vehicleType || 'bike',
         vehicleNumber: formData.drivingLicense || "N/A",
         address: formData.location,
         aadharNumber: formData.aadhaar,
@@ -184,14 +187,14 @@ export default function DeliveryRegistration() {
                   <label className="block text-sm font-bold text-gray-700 mb-1">Vehicle Type <span className="text-red-500">*</span></label>
                   <select required value={formData.vehicleType} onChange={e => setFormData({...formData, vehicleType: e.target.value})} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-900 font-medium bg-white">
                     <option value="">Select Vehicle...</option>
-                    {vehicleTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                    {vehicleTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Driving License No. {formData.vehicleType !== 'Bicycle' && <span className="text-red-500">*</span>}</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Driving License No. {formData.vehicleType !== 'bicycle' && <span className="text-red-500">*</span>}</label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input required={formData.vehicleType !== 'Bicycle'} type="text" value={formData.drivingLicense} onChange={e => setFormData({...formData, drivingLicense: e.target.value})} className="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-900 font-medium uppercase" placeholder="License Number" />
+                    <input required={formData.vehicleType !== 'bicycle'} type="text" value={formData.drivingLicense} onChange={e => setFormData({...formData, drivingLicense: e.target.value})} className="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-900 font-medium uppercase" placeholder="License Number" />
                   </div>
                 </div>
               </div>

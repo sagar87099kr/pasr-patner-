@@ -7,7 +7,7 @@ async function check() {
 
   const order = await db.collection('orders').findOne({ deliveryOTP: { $exists: true } });
   if (order) {
-    console.log("Order has deliveryOTP:", order.deliveryOTP);
+    console.log("Order has deliveryOTP:", order.deliveryOTP, "Type:", typeof order.deliveryOTP);
   } else {
     console.log("No deliveryOTP found");
   }
