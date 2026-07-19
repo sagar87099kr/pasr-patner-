@@ -64,7 +64,7 @@ export default function PartnerDashboard() {
       <aside className="w-64 bg-indigo-900 text-white flex flex-col hidden md:flex">
         <div className="p-6">
           <h1 className="text-2xl font-extrabold tracking-tight">PaSr Partner</h1>
-          <p className="text-xs text-indigo-300 font-bold mt-1">Connected: pasr.in</p>
+          <p className="text-xs text-indigo-300 font-bold mt-1">Connected to Backend</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {['Dashboard', 'My Profile', 'Earnings', 'Analytics'].map((tab, i) => (
@@ -113,7 +113,7 @@ export default function PartnerDashboard() {
              <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
                <div className="flex flex-col items-center">
                  <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                 <p className="mt-4 text-indigo-800 font-semibold">Syncing profile with pasr.in...</p>
+                 <p className="mt-4 text-indigo-800 font-semibold">Syncing profile...</p>
                </div>
              </div>
           )}

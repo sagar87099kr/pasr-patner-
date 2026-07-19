@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { BACKEND_BASE_URL } from '@/lib/config';
 
 export async function GET(req: Request) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
     const cookieStore = await cookies();
     const userId = cookieStore.get('pasr_token')?.value;
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/products/search?q=${encodeURIComponent(query)}`;
+    const backendUrl = `${BACKEND_BASE_URL}/api/shop/products/search?q=${encodeURIComponent(query)}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',

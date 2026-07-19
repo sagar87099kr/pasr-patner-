@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { BACKEND_BASE_URL } from '@/lib/config';
+
 
 export async function GET() {
   try {
@@ -11,8 +13,7 @@ export async function GET() {
     }
 
     // Proxy to Express backend
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/my-profiles`;
-    
+    const backendUrl = `${BACKEND_BASE_URL}/api/partner/my-profiles`;
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
       headers: {
@@ -30,13 +31,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Invalid response from backend' }, { status: 500 });
     }
 
-    if (!backendRes.ok) {
-      return NextResponse.json(data, { status: backendRes.status });
+    if (!backendRes.ok || data.success === false) {
+      return NextResponse.json(data, { status: backendRes.status || 400 });
     }
 
-    return NextResponse.json(data);
+    // The backend returns { success: true, profiles: [...] }
+    return NextResponse.json({ profiles: data.profiles });
   } catch (error: any) {
-    console.error('Error fetching profiles:', error);
+    console.error('Error fetching profiles proxy:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { BACKEND_BASE_URL } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -7,7 +8,7 @@ export async function GET() {
     const userId = cookieStore.get('pasr_token')?.value;
     const activeShopId = cookieStore.get('active_shop_id')?.value;
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/partner/profile`;
+    const backendUrl = `${BACKEND_BASE_URL}/api/partner/profile`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
