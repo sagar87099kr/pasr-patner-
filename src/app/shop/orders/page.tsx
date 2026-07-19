@@ -270,6 +270,25 @@ export default function OrdersPage() {
                 </div>
               </div>
 
+              {selectedOrder.deliveryPartnerId && ['ASSIGNED', 'OUT_FOR_DELIVERY', 'COMPLETED', 'DELIVERED'].includes(selectedOrder.orderStatus) && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Delivery Partner</h4>
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center gap-4">
+                    <img 
+                      src={selectedOrder.deliveryPartnerId.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedOrder.deliveryPartnerId.fullName || 'Partner')}&background=random`} 
+                      alt="Delivery Partner" 
+                      className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm shrink-0" 
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">{selectedOrder.deliveryPartnerId.fullName || 'Delivery Partner'}</p>
+                      <p className="text-sm text-indigo-600 mt-1 flex items-center gap-1 font-medium">
+                        <Phone size={14}/> {selectedOrder.deliveryPartnerId.phoneNumber || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Items Ordered</h4>
                 <div className="space-y-3">
