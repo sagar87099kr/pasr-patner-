@@ -8,7 +8,10 @@ import {
   Clock,
   CheckCircle2,
   Tag,
-  MapPin
+  MapPin,
+  XCircle,
+  Banknote,
+  Loader2
 } from 'lucide-react';
 
 export default function ShopDashboard() {
@@ -70,29 +73,53 @@ export default function ShopDashboard() {
   }, []);
 
   const totalOrders = orders.length;
-  const newOrders = orders.filter(o => o.status === 'Pending' || o.status === 'Processing' || o.status === 'CREATED');
-  const completedOrdersList = orders.filter(o => o.status === 'Completed' || o.status === 'Delivered' || o.status === 'COMPLETED');
+  const activeOrders = orders.filter(o => ['Pending', 'Processing', 'CREATED', 'ACCEPTED', 'READY_FOR_DELIVERY', 'BROADCAST', 'ASSIGNED', 'OUT_FOR_DELIVERY'].includes(o.status || o.orderStatus));
+  const completedOrdersList = orders.filter(o => ['Completed', 'Delivered', 'COMPLETED'].includes(o.status || o.orderStatus));
+  const cancelledOrders = orders.filter(o => ['Cancelled', 'CANCELLED'].includes(o.status || o.orderStatus));
   
-  const unsettledOrders = completedOrdersList.filter(o => o.settlementStatus !== 'SETTLED');
-  const paymentToReceive = unsettledOrders.reduce((sum, o) => {
-    const isSelfPickup = !!o.selfDelivery || o.deliveryType === 'Self Pickup';
+  const unsettledOrders = completedOrdersList.filter(o => o.settlementStatus === 'PENDING');
+  const paymentToReceive = unsettledOrders.reduce((sum, order) => {
+    let earningsForShop = 0;
+    const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup';
+    const actualItemPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
+
     if (isSelfPickup) {
-      return sum + (o.coinDiscount || 0);
+        if (order.paymentType === 'PREPAID') {
+            earningsForShop = actualItemPrice;
+            if (order.deliveryType === 'HOME_DELIVERY') {
+                earningsForShop += (order.deliveryCharge || 0);
+            }
+            earningsForShop -= (order.pasrCommission || 0);
+        } else {
+            // COD - Shop collected everything
+            earningsForShop = (order.coinDiscount || 0) - (order.pasrCommission || 0);
+        }
     } else {
-      return sum + (o.totalAmount || 0) + (o.coinDiscount || 0);
+        // PASR Delivery Partner delivered it
+        earningsForShop = actualItemPrice;
     }
+
+    return sum + (earningsForShop > 0 ? earningsForShop : 0);
   }, 0);
 
   const metrics = [
-    { title: "Total Orders", value: loading ? "..." : (dashboard?.totalOrders ?? totalOrders).toString(), icon: ShoppingCart, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" },
+    { title: "Created Orders", value: loading ? "..." : (dashboard?.todaysOrders ?? totalOrders).toString(), icon: ShoppingCart, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" },
     { 
-      title: "New Orders", 
-      value: loading ? "..." : newOrders.length.toString(), 
-      icon: Clock, color: "text-amber-600", bg: "bg-amber-100", link: "/shop/orders?filter=pending",
-      hasNotification: newOrders.length > 0 
+      title: "Active Orders", 
+      value: loading ? "..." : activeOrders.length.toString(), 
+      icon: Clock, color: "text-amber-600", bg: "bg-amber-100", link: "/shop/orders?filter=active",
+      hasNotification: activeOrders.length > 0 
     },
-    { title: "Payment to Receive", value: loading ? "..." : `₹${paymentToReceive}`, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-100", link: "#payment-history" },
+    { title: "Completed Orders", value: loading ? "..." : completedOrdersList.length.toString(), icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-100", link: "/shop/orders?filter=completed" },
+    { title: "Cancelled Orders", value: loading ? "..." : cancelledOrders.length.toString(), icon: XCircle, color: "text-red-600", bg: "bg-red-100", link: "/shop/orders?filter=cancelled" },
     { title: "Total Products", value: loading ? "..." : products.length.toString(), icon: Package, color: "text-purple-600", bg: "bg-purple-100", link: "/shop/products" },
+    { 
+      title: "Payment to Receive", 
+      value: loading ? "..." : `₹${paymentToReceive.toFixed(2)}`, 
+      icon: Banknote, color: "text-green-600", bg: "bg-green-100", 
+      link: "#",
+      action: paymentToReceive > 0 ? { label: requestPayoutLoading ? 'Requesting...' : 'Request Money', onClick: handleRequestPayout, disabled: requestPayoutLoading } : null
+    },
   ];
 
   return (
@@ -107,33 +134,51 @@ export default function ShopDashboard() {
         {metrics.map((metric, i) => {
           const Icon = metric.icon;
           return (
-            <button 
+            <div 
               key={i} 
-              onClick={() => {
-                if (metric.link.startsWith('#')) {
-                  document.querySelector(metric.link)?.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  router.push(metric.link);
-                }
-              }}
-              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all text-left w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 relative"
+              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all text-left w-full relative flex flex-col justify-between h-full"
             >
-              {metric.hasNotification && (
-                <span className="absolute top-6 right-6 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
-                </span>
-              )}
-              <div className="flex items-center justify-between">
-                <div className={`w-12 h-12 rounded-2xl ${metric.bg} flex items-center justify-center`}>
-                  <Icon className={metric.color} size={24} />
+              <button 
+                onClick={() => {
+                  if (metric.link === '#') return;
+                  if (metric.link.startsWith('#')) {
+                    document.querySelector(metric.link)?.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    router.push(metric.link);
+                  }
+                }}
+                className="focus:outline-none w-full text-left"
+              >
+                {metric.hasNotification && (
+                  <span className="absolute top-6 right-6 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
+                  </span>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className={`w-12 h-12 rounded-2xl ${metric.bg} flex items-center justify-center`}>
+                    <Icon className={metric.color} size={24} />
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-gray-500 text-sm font-medium">{metric.title}</h3>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
-              </div>
-            </button>
+                <div className="mt-4">
+                  <h3 className="text-gray-500 text-sm font-medium">{metric.title}</h3>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
+                </div>
+              </button>
+              
+              {metric.action && (
+                <div className="mt-4 pt-4 border-t border-gray-50">
+                  <button 
+                    onClick={metric.action.onClick}
+                    disabled={metric.action.disabled}
+                    className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white py-2 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    {metric.action.disabled && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {metric.action.label}
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -240,7 +285,7 @@ export default function ShopDashboard() {
                   const orderTypeStr = isSelfPickup ? 'Self Pickup' : (order.paymentType === 'COD' ? 'COD Delivery' : 'Prepaid Delivery');
 
                   return (
-                    <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={order._id || order.id || order.orderId} className="hover:bg-gray-50/50 transition-colors">
                       <td className="p-6">
                         <p className="font-bold text-gray-900">{order.orderId}</p>
                         <p className="text-xs text-gray-500 mt-1">{order.createdAt}</p>
@@ -257,7 +302,9 @@ export default function ShopDashboard() {
                       <td className="p-6 font-bold text-indigo-600">
                         ₹{pasrOwes}
                         <div className="text-[10px] text-gray-500 font-normal mt-1 flex items-center gap-1">
-                           <CheckCircle2 size={10} className="text-emerald-500"/> Settled
+                           {(!order.settlementStatus || order.settlementStatus === 'PENDING') && <><Clock size={10} className="text-amber-500"/> Pending</>}
+                           {order.settlementStatus === 'REQUESTED' && <><Loader2 size={10} className="text-blue-500 animate-spin"/> Requested</>}
+                           {order.settlementStatus === 'SETTLED' && <><CheckCircle2 size={10} className="text-emerald-500"/> Settled</>}
                         </div>
                       </td>
                       <td className="p-6">
