@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Truck, DollarSign, MapPin, Clock, CheckCircle, Loader2, Package, Check, Navigation } from 'lucide-react';
+import { Truck, MapPin, Loader2, Package, Check, Navigation } from 'lucide-react';
 
-export default function DeliveryDashboard() {
+export default function ActiveTrips() {
   const [orderId, setOrderId] = useState('');
   const [otp, setOtp] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  const [partner, setPartner] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
-  const [broadcastOrders, setBroadcastOrders] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
@@ -20,9 +18,7 @@ export default function DeliveryDashboard() {
       const res = await fetch('/api/partner/delivery/dashboard');
       const data = await res.json();
       if (data.success) {
-        setPartner(data.partner);
         setActiveOrders(data.activeOrders || []);
-        setBroadcastOrders(data.broadcastOrders || []);
       }
     } catch (e) {
       console.error('Failed to fetch dashboard', e);
@@ -39,7 +35,6 @@ export default function DeliveryDashboard() {
     if (!orderId) return alert('Enter Order ID');
     if (!otp || otp.length < 4) return alert('Enter a valid 4-digit OTP');
     
-    // Find the real MongoDB _id
     const targetOrder = activeOrders.find((o: any) => o.orderId === orderId || o._id === orderId);
     if (!targetOrder) return alert('Order not found in your active deliveries!');
 
@@ -63,28 +58,6 @@ export default function DeliveryDashboard() {
       alert('Verification failed');
     } finally {
       setVerifying(false);
-    }
-  };
-
-  const acceptOrder = async (id: string) => {
-    setActionLoading(id);
-    try {
-      const res = await fetch('/api/partner/delivery/accept', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: id })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        alert('Order Accepted!');
-        fetchDashboard();
-      } else {
-        alert(data.message || 'Failed to accept order');
-      }
-    } catch (e) {
-      alert('Error accepting order');
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -122,105 +95,12 @@ export default function DeliveryDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Delivery Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Welcome back, {partner?.fullName || 'Partner'}.</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Active Trips</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage your currently assigned deliveries.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/partner/delivery/toggle-status', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ isActive: !partner?.isActive })
-                });
-                const data = await res.json();
-                if (data.success) {
-                  fetchDashboard(); // Refresh to get the new status
-                } else {
-                  alert(data.message || 'Failed to update status');
-                }
-              } catch (e) {
-                alert('An error occurred while updating status');
-              }
-            }}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-              partner?.isActive ? 'bg-green-500' : 'bg-gray-200'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                partner?.isActive ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-          <span className="text-sm font-medium text-gray-700">
-            {partner?.isActive ? 'Online' : 'Offline'}
-          </span>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Completed Trips</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">{partner?.totalDeliveries || 0}</h3>
-            </div>
-            <div className="bg-indigo-50 p-3 rounded-xl text-indigo-600">
-              <CheckCircle size={24} />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
-            Total Deliveries
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Active Deliveries</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">{partner?.currentOrders || 0}</h3>
-            </div>
-            <div className="bg-amber-50 p-3 rounded-xl text-amber-600">
-              <Truck size={24} />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
-            Currently in progress
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Pending Payout</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹{partner?.pendingPayout || 0}</h3>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
-              <Clock size={24} />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
-            Ready to withdraw
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Total Earnings</p>
-              <h3 className="text-2xl font-bold text-gray-900 mt-2">₹{partner?.totalEarnings || 0}</h3>
-            </div>
-            <div className="bg-green-50 p-3 rounded-xl text-green-600">
-              <DollarSign size={24} />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
-            Lifetime earnings
-          </p>
-        </div>
+        <button onClick={fetchDashboard} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
+            Refresh List
+        </button>
       </div>
 
       {/* Complete Order via OTP */}
@@ -260,16 +140,13 @@ export default function DeliveryDashboard() {
         </div>
       )}
 
-      {/* Active Trips */}
+      {/* Active Trips List */}
       <div className="mt-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Truck className="text-indigo-600" /> My Active Deliveries
-        </h2>
         {activeOrders.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
             <Package size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">You don't have any active deliveries.</p>
-            <p className="text-sm text-gray-400 mt-1">Accept a broadcast order to get started.</p>
+            <p className="text-sm text-gray-400 mt-1">Accept a broadcast order on the dashboard to get started.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -352,58 +229,6 @@ export default function DeliveryDashboard() {
                       </button>
                     )}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Available/Broadcast Orders */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="text-amber-500" /> Available Orders Nearby
-          </h2>
-          <button onClick={fetchDashboard} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
-            Refresh List
-          </button>
-        </div>
-        
-        {broadcastOrders.length === 0 ? (
-          <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-300 p-8 text-center">
-            <p className="text-gray-500 font-medium">No available orders at the moment.</p>
-            <p className="text-sm text-gray-400 mt-1">New orders will appear here when shops broadcast them.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {broadcastOrders.map((order) => (
-              <div key={order._id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:border-amber-300 transition-colors">
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded">NEW</span>
-                      <span className="font-bold text-gray-900">{order.orderId} - {order.customerId?.name || order.customerName || 'Customer'}</span>
-                    </div>
-                    <p className="font-bold text-green-600">Earn ₹{order.partnerEarning}</p>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">From:</span> {order.shopId?.shopName || order.shopId?.owner?.name}</p>
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">To:</span> {order.deliveryAddress}</p>
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">Distance:</span> {order.distanceInKm} km</p>
-                  </div>
-                  
-                  <button 
-                    onClick={() => acceptOrder(order._id)}
-                    disabled={actionLoading === order._id || !partner?.isActive}
-                    className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-                  >
-                    {actionLoading === order._id ? <Loader2 size={18} className="animate-spin" /> : 'Accept Delivery'}
-                  </button>
-                  {!partner?.isActive && (
-                    <p className="text-xs text-red-500 text-center mt-2">You must be Online to accept orders.</p>
-                  )}
                 </div>
               </div>
             ))}

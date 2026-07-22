@@ -270,7 +270,7 @@ export default function OrdersPage() {
                 </div>
               </div>
 
-              {selectedOrder.deliveryPartnerId && ['ASSIGNED', 'OUT_FOR_DELIVERY', 'COMPLETED', 'DELIVERED'].includes(selectedOrder.orderStatus) && (
+              {selectedOrder.deliveryPartnerId && ['ASSIGNED', 'OUT_FOR_DELIVERY'].includes(selectedOrder.orderStatus) && (
                 <div className="mb-6">
                   <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Delivery Partner</h4>
                   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center gap-4">
