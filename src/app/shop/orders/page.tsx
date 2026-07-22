@@ -202,7 +202,7 @@ export default function OrdersPage() {
                     </div>
                   </td>
                   <td className="p-6">
-                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${order.orderStatus === 'Pending' || order.orderStatus === 'CREATED' || order.orderStatus === 'ORDER_SHARED' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getStatusColor(order.orderStatus)}`}>
                       {order.orderStatus}
                     </span>
                   </td>
