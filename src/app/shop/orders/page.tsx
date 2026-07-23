@@ -360,7 +360,7 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              {(selectedOrder.deliveryType?.toLowerCase().includes('self') || selectedOrder.deliveryType === 'SHOP_PICKUP' || selectedOrder.selfDelivery) && (selectedOrder.orderStatus === 'Pending' || selectedOrder.orderStatus === 'CREATED' || selectedOrder.orderStatus === 'ORDER_SHARED' || selectedOrder.status === 'Pending') && (
+              {(selectedOrder.deliveryType?.toLowerCase().includes('self') || selectedOrder.deliveryType === 'SHOP_PICKUP' || selectedOrder.selfDelivery) && ['CREATED', 'ORDER_SHARED', 'Pending', 'ACCEPTED', 'PACKED', 'READY_FOR_DELIVERY'].includes(selectedOrder.orderStatus || selectedOrder.status) && (
                 <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                   <label className="block text-sm font-bold text-gray-700 mb-2">Customer OTP</label>
                   <div className="flex gap-2">
