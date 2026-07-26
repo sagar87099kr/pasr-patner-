@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { BACKEND_BASE_URL } from '@/lib/config';
+import { BACKEND_URL } from '@/lib/config';
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const backendRes = await fetch(`${BACKEND_BASE_URL}/api/auth/login`, {
+    const backendRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { BACKEND_BASE_URL } from '@/lib/config';
+import { BACKEND_URL } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${BACKEND_BASE_URL}/api/shop/products?shopId=${activeShopId}`;
+    const backendUrl = `${BACKEND_URL}/api/shop/products?shopId=${activeShopId}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const backendUrl = `${BACKEND_BASE_URL}/api/shop/products`;
+    const backendUrl = `${BACKEND_URL}/api/shop/products`;
     
     // Pass shopId inside the payload to the backend
     const payload = { ...body, shopId: activeShopId };

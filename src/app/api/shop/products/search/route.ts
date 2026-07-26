@@ -1,27 +1,26 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { BACKEND_BASE_URL } from '@/lib/config';
+import { BACKEND_URL } from '@/lib/config';
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('q');
+    const query = searchParams.get('q') || '';
+    
+    const cookieStore = await cookies();
+    const token = cookieStore.get('pasr_token')?.value;
 
-    if (!query || query.length < 2) {
-      return NextResponse.json({ suggestions: [] });
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const cookieStore = await cookies();
-    const userId = cookieStore.get('pasr_token')?.value;
-
-    const backendUrl = `${BACKEND_BASE_URL}/api/shop/products/search?q=${encodeURIComponent(query)}`;
+    const backendUrl = `${BACKEND_URL}/api/shop/products/search?q=${encodeURIComponent(query)}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userId || ''}`,
-        'Cookie': `pasr_token=${userId || ''}`
+        'Cookie': `pasr_token=${token || ''}`
       }
     });
 

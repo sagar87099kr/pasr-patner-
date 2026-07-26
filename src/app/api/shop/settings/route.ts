@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { BACKEND_URL } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/settings?shopId=${activeShopId}`;
+    const backendUrl = `${BACKEND_URL}/api/shop/settings?shopId=${activeShopId}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
@@ -53,7 +54,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/settings`;
+    const backendUrl = `${BACKEND_URL}/api/shop/settings`;
     
     const payload = { ...body, shopId: activeShopId };
 

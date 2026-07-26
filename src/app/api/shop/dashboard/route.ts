@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { BACKEND_URL } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No active shop selected' }, { status: 400 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/api/shop/dashboard?shopId=${activeShopId}`;
+    const backendUrl = `${BACKEND_URL}/api/shop/dashboard?shopId=${activeShopId}`;
     
     const backendRes = await fetch(backendUrl, {
       method: 'GET',

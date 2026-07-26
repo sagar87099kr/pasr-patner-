@@ -1,7 +1,7 @@
 import Sidebar from '@/components/Sidebar';
 import { Bell, Search } from 'lucide-react';
 import { cookies } from 'next/headers';
-import { BACKEND_BASE_URL } from '@/lib/config';
+import { BACKEND_URL } from '@/lib/config';
 
 export default async function FarmerLayout({
   children,
@@ -17,7 +17,7 @@ export default async function FarmerLayout({
     const userId = cookieStore.get('pasr_token')?.value;
     
     if (activeFarmerId && userId) {
-    const backendUrl = `${BACKEND_BASE_URL}/api/partner/my-profiles`;
+      const backendUrl = `${BACKEND_URL}/api/partner/my-profiles`;
       const res = await fetch(backendUrl, {
         headers: {
           'Authorization': `Bearer ${userId}`,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { BACKEND_BASE_URL } from '@/lib/config';
+import { BACKEND_URL } from '@/lib/config';
 
 
 export async function GET() {
@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     // Proxy to Express backend
-    const backendUrl = `${BACKEND_BASE_URL}/api/partner/me`;
+    const backendUrl = `${BACKEND_URL}/api/partner/me`;
     const backendRes = await fetch(backendUrl, {
       method: 'GET',
       headers: {
