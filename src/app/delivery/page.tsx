@@ -12,6 +12,7 @@ export default function DeliveryDashboard() {
   const [partner, setPartner] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [broadcastOrders, setBroadcastOrders] = useState<any[]>([]);
+  const [upcomingOrders, setUpcomingOrders] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
@@ -23,6 +24,7 @@ export default function DeliveryDashboard() {
         setPartner(data.partner);
         setActiveOrders(data.activeOrders || []);
         setBroadcastOrders(data.broadcastOrders || []);
+        setUpcomingOrders(data.upcomingOrders || []);
       }
     } catch (e) {
       console.error('Failed to fetch dashboard', e);
@@ -358,6 +360,45 @@ export default function DeliveryDashboard() {
           </div>
         )}
       </div>
+
+      {/* Upcoming Orders (Being Prepared) */}
+      {upcomingOrders.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="text-sky-500" /> Upcoming Orders (Being Prepared)
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {upcomingOrders.map((order) => (
+              <div key={order._id} className="bg-sky-50 rounded-2xl border border-sky-200 shadow-sm overflow-hidden opacity-90">
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-sky-100 text-sky-800 text-xs font-bold px-2 py-1 rounded">PREPARING</span>
+                      <span className="font-bold text-gray-900">{order.orderId} - {order.customerId?.name || order.customerName || 'Customer'}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">From:</span> {order.shopId?.shopName || order.shopId?.owner?.name}</p>
+                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">To:</span> {order.deliveryAddress}</p>
+                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">Distance:</span> {order.distanceInKm} km</p>
+                  </div>
+                  
+                  <button 
+                    disabled
+                    className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-500 py-3 rounded-xl font-bold transition-colors cursor-not-allowed"
+                  >
+                    Waiting for Shop
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Available/Broadcast Orders */}
       <div className="mt-8">

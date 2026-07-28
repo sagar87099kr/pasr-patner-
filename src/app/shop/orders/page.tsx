@@ -363,7 +363,7 @@ export default function OrdersPage() {
               {(selectedOrder.deliveryType?.toLowerCase().includes('self') || selectedOrder.deliveryType === 'SHOP_PICKUP' || selectedOrder.selfDelivery) && ['CREATED', 'ORDER_SHARED', 'Pending', 'ACCEPTED', 'PACKED', 'READY_FOR_DELIVERY'].includes(selectedOrder.orderStatus || selectedOrder.status) && (
                 <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                   <label className="block text-sm font-bold text-gray-700 mb-2">Customer OTP</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <input 
                       type="text" 
                       maxLength={4}
@@ -375,7 +375,7 @@ export default function OrdersPage() {
                     <button 
                       onClick={verifyOtp}
                       disabled={verifying || otp.length < 4}
-                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                      className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center whitespace-nowrap"
                     >
                       {verifying ? <Loader2 size={20} className="animate-spin" /> : 'Complete Order'}
                     </button>
