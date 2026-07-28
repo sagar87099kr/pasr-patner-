@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { Truck, DollarSign, MapPin, Clock, CheckCircle, Loader2, Package, Check, Navigation } from 'lucide-react';
 
 export default function DeliveryDashboard() {
-  const [orderId, setOrderId] = useState('');
-  const [otp, setOtp] = useState('');
+  const [otps, setOtps] = useState<{[key: string]: string}>({});
   const [verifying, setVerifying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [requestingPayout, setRequestingPayout] = useState(false);
   
   const [partner, setPartner] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
@@ -37,34 +37,56 @@ export default function DeliveryDashboard() {
     fetchDashboard();
   }, []);
 
-  const verifyOtp = async () => {
-    if (!orderId) return alert('Enter Order ID');
-    if (!otp || otp.length < 4) return alert('Enter a valid 4-digit OTP');
+  const verifyOtp = async (targetOrderId: string, otpToVerify: string) => {
+    if (!otpToVerify || otpToVerify.length < 4) return alert('Enter a valid 4-digit OTP');
     
-    // Find the real MongoDB _id
-    const targetOrder = activeOrders.find((o: any) => o.orderId === orderId || o._id === orderId);
-    if (!targetOrder) return alert('Order not found in your active deliveries!');
-
     setVerifying(true);
     try {
       const res = await fetch('/api/partner/delivery/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: targetOrder._id, otp })
+        body: JSON.stringify({ orderId: targetOrderId, otp: otpToVerify })
       });
       const data = await res.json();
       if (res.ok) {
         alert('Order Completed Successfully! Payout has been credited.');
-        setOrderId('');
-        setOtp('');
+        setOtps(prev => {
+          const newOtps = { ...prev };
+          delete newOtps[targetOrderId];
+          return newOtps;
+        });
         fetchDashboard();
       } else {
         alert(data.error || data.message || 'Invalid OTP');
       }
     } catch (e) {
-      alert('Verification failed');
+      console.error(e);
+      alert('An error occurred');
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleRequestPayout = async () => {
+    if (!confirm('This will request the Admin to send your pending balance to your UPI. Proceed?')) return;
+    
+    setRequestingPayout(true);
+    try {
+      const res = await fetch('/api/partner/delivery/request-payout', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('✅ Payout Request Sent! Admin will process your payout soon.');
+        fetchDashboard();
+      } else {
+        alert(data.message || data.error || 'Failed to request payout.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('An error occurred while requesting payout.');
+    } finally {
+      setRequestingPayout(false);
     }
   };
 
@@ -204,9 +226,20 @@ export default function DeliveryDashboard() {
               <Clock size={24} />
             </div>
           </div>
-          <p className="text-gray-400 text-sm font-medium mt-4 flex items-center gap-1">
-            Ready to withdraw
-          </p>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-gray-400 text-sm font-medium flex items-center gap-1">
+              Ready to withdraw
+            </p>
+            {(partner?.pendingPayout || 0) > 0 && (
+              <button 
+                onClick={handleRequestPayout}
+                disabled={requestingPayout}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
+              >
+                {requestingPayout ? <Loader2 size={14} className="animate-spin" /> : 'Request'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -225,42 +258,7 @@ export default function DeliveryDashboard() {
         </div>
       </div>
 
-      {/* Complete Order via OTP */}
-      {activeOrders.some(o => o.orderStatus === 'OUT_FOR_DELIVERY') && (
-        <div className="mt-8">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-gray-900">Complete Delivery</h2>
-              <p className="text-sm text-gray-500">Enter the Order ID and the OTP provided by the customer to mark the delivery as completed.</p>
-            </div>
-            
-            <div className="flex flex-col md:flex-row gap-4 max-w-2xl">
-              <input 
-                type="text" 
-                value={orderId}
-                onChange={(e) => setOrderId(e.target.value)}
-                placeholder="Order ID" 
-                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <input 
-                type="text" 
-                maxLength={4}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="4-digit OTP" 
-                className="w-full md:w-48 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-lg tracking-widest font-bold text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button 
-                onClick={verifyOtp}
-                disabled={verifying || otp.length < 4 || !orderId}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 min-w-[140px] flex justify-center items-center"
-              >
-                {verifying ? <Loader2 size={20} className="animate-spin" /> : 'Verify & Complete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Complete Order via OTP has been moved inline into the order cards */}
 
       {/* Active Trips */}
       <div className="mt-8">
@@ -343,15 +341,24 @@ export default function DeliveryDashboard() {
                       </button>
                     )}
                     {order.orderStatus === 'OUT_FOR_DELIVERY' && (
-                      <button 
-                        onClick={() => {
-                          setOrderId(order.orderId);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-                      >
-                        Enter OTP
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          maxLength={4}
+                          value={otps[order._id] || ''}
+                          onChange={(e) => setOtps({...otps, [order._id]: e.target.value.replace(/[^0-9]/g, '')})}
+                          placeholder="OTP" 
+                          className="w-20 px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-center tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <button 
+                          onClick={() => verifyOtp(order._id, otps[order._id] || '')}
+                          disabled={verifying || (otps[order._id] || '').length < 4}
+                          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
+                        >
+                          {verifying ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                          Verify
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -361,44 +368,7 @@ export default function DeliveryDashboard() {
         )}
       </div>
 
-      {/* Upcoming Orders (Being Prepared) */}
-      {upcomingOrders.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Clock className="text-sky-500" /> Upcoming Orders (Being Prepared)
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {upcomingOrders.map((order) => (
-              <div key={order._id} className="bg-sky-50 rounded-2xl border border-sky-200 shadow-sm overflow-hidden opacity-90">
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-sky-100 text-sky-800 text-xs font-bold px-2 py-1 rounded">PREPARING</span>
-                      <span className="font-bold text-gray-900">{order.orderId} - {order.customerId?.name || order.customerName || 'Customer'}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">From:</span> {order.shopId?.shopName || order.shopId?.owner?.name}</p>
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">To:</span> {order.deliveryAddress}</p>
-                    <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">Distance:</span> {order.distanceInKm} km</p>
-                  </div>
-                  
-                  <button 
-                    disabled
-                    className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-500 py-3 rounded-xl font-bold transition-colors cursor-not-allowed"
-                  >
-                    Waiting for Shop
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Upcoming orders moved to preparing page */}
 
       {/* Available/Broadcast Orders */}
       <div className="mt-8">

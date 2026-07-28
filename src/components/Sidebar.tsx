@@ -61,6 +61,7 @@ const roleConfig = {
     icon: Truck,
     navItems: [
       { name: 'Dashboard', href: '/delivery', icon: LayoutDashboard },
+      { name: 'Order Preparing', href: '/delivery/preparing', icon: Clock },
       { name: 'Active Trips', href: '/delivery/active', icon: MapPin },
       { name: 'History', href: '/delivery/history', icon: Clock },
       { name: 'Settings', href: '/delivery/settings', icon: Settings },
