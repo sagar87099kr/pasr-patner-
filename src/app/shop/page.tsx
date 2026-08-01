@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Package, 
@@ -13,6 +13,16 @@ import {
   Banknote,
   Loader2
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 
 export default function ShopDashboard() {
   const router = useRouter();
@@ -21,6 +31,34 @@ export default function ShopDashboard() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [requestPayoutLoading, setRequestPayoutLoading] = useState(false);
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!tableContainerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - tableContainerRef.current.offsetLeft);
+    setScrollLeft(tableContainerRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !tableContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - tableContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    tableContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   const handleRequestPayout = async () => {
     setRequestPayoutLoading(true);
@@ -102,8 +140,36 @@ export default function ShopDashboard() {
     return sum + (earningsForShop > 0 ? earningsForShop : 0);
   }, 0);
 
+  const todaysOrdersList = orders.filter(o => {
+    if (!o.createdAt && !o.orderDate) return false;
+    try {
+      const orderDate = new Date(o.createdAt || o.orderDate);
+      return orderDate.toDateString() === new Date().toDateString();
+    } catch(e) { return false; }
+  });
+
+  const totalAmountSellToday = dashboard?.totalAmountSellToday ?? todaysOrdersList.reduce((sum, order) => {
+    if (['Cancelled', 'CANCELLED'].includes(order.status || order.orderStatus)) return sum;
+    const actualItemPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
+    return sum + actualItemPrice;
+  }, 0);
+
+  const thisMonthOrdersList = orders.filter(o => {
+    if (!o.createdAt && !o.orderDate) return false;
+    try {
+      const orderDate = new Date(o.createdAt || o.orderDate);
+      const now = new Date();
+      return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+    } catch(e) { return false; }
+  });
+
+  const totalAmountSellThisMonth = dashboard?.totalAmountSellThisMonth ?? thisMonthOrdersList.reduce((sum, order) => {
+    if (['Cancelled', 'CANCELLED'].includes(order.status || order.orderStatus)) return sum;
+    const actualItemPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
+    return sum + actualItemPrice;
+  }, 0);
+
   const metrics = [
-    { title: "Created Orders", value: loading ? "..." : (dashboard?.todaysOrders ?? totalOrders).toString(), icon: ShoppingCart, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" },
     { 
       title: "Active Orders", 
       value: loading ? "..." : activeOrders.length.toString(), 
@@ -111,8 +177,17 @@ export default function ShopDashboard() {
       hasNotification: activeOrders.length > 0 
     },
     { title: "Completed Orders", value: loading ? "..." : completedOrdersList.length.toString(), icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-100", link: "/shop/orders?filter=completed" },
-    { title: "Cancelled Orders", value: loading ? "..." : cancelledOrders.length.toString(), icon: XCircle, color: "text-red-600", bg: "bg-red-100", link: "/shop/orders?filter=cancelled" },
     { title: "Total Products", value: loading ? "..." : products.length.toString(), icon: Package, color: "text-purple-600", bg: "bg-purple-100", link: "/shop/products" },
+    { 
+      title: "Today's Sales", 
+      value: loading ? "..." : `₹${totalAmountSellToday.toFixed(2)}`, 
+      icon: Banknote, color: "text-blue-600", bg: "bg-blue-100", link: "/shop/orders" 
+    },
+    { 
+      title: "This Month's Sales", 
+      value: loading ? "..." : `₹${totalAmountSellThisMonth.toFixed(2)}`, 
+      icon: Banknote, color: "text-indigo-600", bg: "bg-indigo-100", link: "/shop/orders" 
+    },
     { 
       title: "Payment to Receive", 
       value: loading ? "..." : `₹${paymentToReceive.toFixed(2)}`, 
@@ -121,6 +196,37 @@ export default function ShopDashboard() {
       action: paymentToReceive > 0 ? { label: requestPayoutLoading ? 'Requesting...' : 'Request Money', onClick: handleRequestPayout, disabled: requestPayoutLoading } : null
     },
   ];
+
+  // Generate last 7 days chart data
+  const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return {
+      date: d,
+      dateString: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+      sales: 0,
+      coinDiscount: 0,
+      orders: 0
+    };
+  });
+
+  completedOrdersList.forEach(order => {
+    if (!order.createdAt && !order.orderDate) return;
+    try {
+      const orderDate = new Date(order.createdAt || order.orderDate);
+      const dayData = last7DaysData.find(d => 
+        d.date.getDate() === orderDate.getDate() && 
+        d.date.getMonth() === orderDate.getMonth() &&
+        d.date.getFullYear() === orderDate.getFullYear()
+      );
+      if (dayData) {
+        const actualItemPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
+        dayData.sales += actualItemPrice;
+        dayData.coinDiscount += (order.coinDiscount || 0);
+        dayData.orders += 1;
+      }
+    } catch (e) {}
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -183,59 +289,38 @@ export default function ShopDashboard() {
         })}
       </div>
 
-      {/* Listed Products Overview */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mt-8">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Package size={20} className="text-indigo-600" /> Your Listed Products</h2>
-          <button onClick={() => window.location.href = '/shop/products'} className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">View All &rarr;</button>
-        </div>
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-          <table className="w-full text-left border-collapse relative">
-            <thead className="sticky top-0 bg-white shadow-sm z-10">
-              <tr className="bg-gray-50/50 text-gray-500 text-sm font-semibold uppercase tracking-wider">
-                <th className="p-6 font-medium">Product</th>
-                <th className="p-6 font-medium">Category</th>
-                <th className="p-6 font-medium">Price</th>
-                <th className="p-6 font-medium">Stock</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-12 text-center text-gray-500">Loading your products...</td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-12 text-center text-gray-500">You haven't listed any products yet.</td>
-                </tr>
-              ) : (
-                products.map((product) => (
-                  <tr key={product._id || product.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="p-6">
-                      <div className="flex items-center gap-4">
-                        <img src={product.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'} alt={product.name || product.product?.productName} className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
-                        <div>
-                          <p className="font-bold text-gray-900">{product.name || product.product?.productName}</p>
-                          <p className="flex items-center text-xs text-gray-500 mt-1 gap-1"><MapPin size={12} /> {product.loc || 'In Stock'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-600">
-                        <Tag size={12} /> {product.itemCategory || product.product?.categories || product.category || 'General'}
-                      </span>
-                    </td>
-                    <td className="p-6 font-bold text-gray-900">₹{product.price}</td>
-                    <td className="p-6">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${product.isActive !== false ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                        {product.isActive !== false ? 'In Stock' : 'Out of Stock'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Sales Chart */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mt-8">
+        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <Banknote size={20} className="text-indigo-600" /> Sales Overview (Last 7 Days)
+        </h2>
+        <div className="h-72 w-full">
+          {loading ? (
+            <div className="h-full w-full flex items-center justify-center text-gray-500">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            </div>
+          ) : last7DaysData.every(d => d.sales === 0) ? (
+            <div className="h-full w-full flex flex-col items-center justify-center text-gray-500 gap-2">
+              <Banknote className="w-12 h-12 text-gray-300" />
+              <p>No sales data for the last 7 days.</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={last7DaysData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="dateString" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(val) => `₹${val}`} />
+                <Tooltip 
+                  cursor={{ fill: '#f9fafb' }} 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: any, name: any) => [`₹${value.toFixed(2)}`, name === 'sales' ? 'Sales' : 'Coin Discount']}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="sales" name="sales" fill="#4f46e5" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="coinDiscount" name="coinDiscount" fill="#eab308" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -255,15 +340,25 @@ export default function ShopDashboard() {
             </button>
           )}
         </div>
-        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+        <div className="hidden md:flex justify-end pt-2 pb-2 px-6 bg-white">
+           <p className="text-xs text-indigo-400 italic font-medium">Drag horizontally to scroll history &rarr;</p>
+        </div>
+        <div 
+          ref={tableContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          className={`overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+        >
           <table className="w-full text-left border-collapse relative">
             <thead className="sticky top-0 bg-white shadow-sm z-10">
               <tr className="bg-gray-50/50 text-gray-500 text-sm font-semibold uppercase tracking-wider">
                 <th className="p-6 font-medium">Order ID / Date</th>
-                <th className="p-6 font-medium">Actual Price</th>
-                <th className="p-6 font-medium">Coin Discount</th>
-                <th className="p-6 font-medium">Shop Collected</th>
-                <th className="p-6 font-medium">Pasr Settlement</th>
+                <th className="p-6 font-medium">Total Sales Amount</th>
+                <th className="p-6 font-medium">Pasr Pays (Coin Discount)</th>
+                <th className="p-6 font-medium">Pasr Pays (Home Delivery)</th>
+                <th className="p-6 font-medium">Total Pasr Will Pay</th>
                 <th className="p-6 font-medium">Order Type</th>
               </tr>
             </thead>
@@ -279,9 +374,28 @@ export default function ShopDashboard() {
               ) : (
                 completedOrdersList.map((order) => {
                   const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup';
-                  const actualPrice = (order.totalAmount || 0) + (order.coinDiscount || 0);
-                  const shopCollected = isSelfPickup ? (order.totalAmount || 0) : 0;
-                  const pasrOwes = isSelfPickup ? (order.coinDiscount || 0) : actualPrice;
+                  const actualPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
+                  const coinDiscount = order.coinDiscount || 0;
+                  
+                  let totalPasrWillPay = 0;
+                  let pasrPaysHomeDelivery = 0;
+                  
+                  if (isSelfPickup) {
+                      if (order.paymentType === 'PREPAID') {
+                          totalPasrWillPay = actualPrice - (order.pasrCommission || 0);
+                          pasrPaysHomeDelivery = totalPasrWillPay - coinDiscount;
+                      } else {
+                          totalPasrWillPay = coinDiscount - (order.pasrCommission || 0);
+                          pasrPaysHomeDelivery = 0;
+                      }
+                  } else {
+                      totalPasrWillPay = actualPrice;
+                      pasrPaysHomeDelivery = totalPasrWillPay - coinDiscount;
+                  }
+
+                  if (pasrPaysHomeDelivery < 0) pasrPaysHomeDelivery = 0;
+                  if (totalPasrWillPay < 0) totalPasrWillPay = 0;
+
                   const orderTypeStr = isSelfPickup ? 'Self Pickup' : (order.paymentType === 'COD' ? 'COD Delivery' : 'Prepaid Delivery');
 
                   return (
@@ -294,13 +408,13 @@ export default function ShopDashboard() {
                         ₹{actualPrice}
                       </td>
                       <td className="p-6 font-bold text-yellow-600">
-                        {order.coinDiscount > 0 ? `-₹${order.coinDiscount}` : 'None'}
+                        ₹{coinDiscount}
                       </td>
-                      <td className="p-6 font-bold text-emerald-600">
-                        ₹{shopCollected}
+                      <td className="p-6 font-bold text-blue-600">
+                        ₹{pasrPaysHomeDelivery}
                       </td>
                       <td className="p-6 font-bold text-indigo-600">
-                        ₹{pasrOwes}
+                        ₹{totalPasrWillPay}
                         <div className="text-[10px] text-gray-500 font-normal mt-1 flex items-center gap-1">
                            {(!order.settlementStatus || order.settlementStatus === 'PENDING') && <><Clock size={10} className="text-amber-500"/> Pending</>}
                            {order.settlementStatus === 'REQUESTED' && <><Loader2 size={10} className="text-blue-500 animate-spin"/> Requested</>}
