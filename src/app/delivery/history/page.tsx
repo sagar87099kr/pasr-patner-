@@ -6,24 +6,53 @@ import { History as HistoryIcon, Loader2, Calendar, MapPin, CheckCircle, XCircle
 export default function HistoryPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  const fetchHistory = async () => {
-    setLoading(true);
+  const fetchHistory = async (currentSkip = 0, append = false) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
     try {
-      const res = await fetch('/api/partner/delivery/history');
+      const res = await fetch(`/api/partner/delivery/history?skip=${currentSkip}`);
       const data = await res.json();
       if (data.success) {
-        setHistory(data.history || []);
+        const newOrders = data.history || [];
+        if (append) {
+          setHistory(prev => [...prev, ...newOrders]);
+        } else {
+          setHistory(newOrders);
+        }
+        
+        if (newOrders.length < 20) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch history', e);
     } finally {
-      setLoading(false);
+      if (append) setLoadingMore(false);
+      else setLoading(false);
     }
   };
 
+  const handleLoadMore = () => {
+    const newSkip = skip + 20;
+    setSkip(newSkip);
+    fetchHistory(newSkip, true);
+  };
+
+  const refreshList = () => {
+    setSkip(0);
+    setHasMore(true);
+    fetchHistory(0, false);
+  };
+
   useEffect(() => {
-    fetchHistory();
+    fetchHistory(0, false);
   }, []);
 
   if (loading) {
@@ -43,7 +72,7 @@ export default function HistoryPage() {
           </h1>
           <p className="text-gray-500 text-sm mt-1">View your past completed and cancelled deliveries.</p>
         </div>
-        <button onClick={fetchHistory} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
+        <button onClick={refreshList} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
           Refresh List
         </button>
       </div>
@@ -89,10 +118,39 @@ export default function HistoryPage() {
                 <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg mt-2">
                   <p><strong className="text-gray-700">From:</strong> {order.shopId?.shopName || order.shopId?.owner?.name}</p>
                   <p><strong className="text-gray-700">To:</strong> {order.customerId?.name || 'Customer'} ({order.deliveryAddress})</p>
+                  
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    {order.paymentType === 'COD' && order.orderStatus === 'COMPLETED' ? (
+                      <p className="text-amber-700 font-bold text-sm bg-amber-50 p-2 rounded inline-block border border-amber-200 shadow-sm">
+                        Amount Collected: ₹{Number(order.totalAmount || 0).toFixed(2)}
+                      </p>
+                    ) : order.paymentType === 'COD' && order.orderStatus === 'CANCELLED' ? (
+                      <p className="text-red-600 font-semibold text-sm">
+                        Amount Collected: ₹0.00 (Cancelled)
+                      </p>
+                    ) : (
+                      <p className="text-emerald-700 font-semibold text-sm bg-emerald-50 p-2 rounded inline-block border border-emerald-200">
+                        Paid Online - ₹0.00 Collected
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
+          
+          {hasMore && history.length >= 20 && (
+            <div className="flex justify-center mt-6 pt-4 pb-8">
+              <button 
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="bg-indigo-50 text-indigo-700 px-6 py-2.5 rounded-full font-medium hover:bg-indigo-100 disabled:opacity-50 flex items-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+              >
+                {loadingMore && <Loader2 className="animate-spin" size={16} />}
+                {loadingMore ? 'Loading...' : 'Load 20 More'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

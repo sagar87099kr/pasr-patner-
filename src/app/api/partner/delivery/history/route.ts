@@ -10,7 +10,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized. Please login.' }, { status: 401 });
     }
 
-    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/delivery/api/history`;
+    const url = new URL(req.url);
+    const skip = url.searchParams.get('skip') || '0';
+    const backendUrl = `${process.env.BACKEND_URL || 'https://www.pasr.in'}/delivery/api/history?skip=${skip}`;
     const backendRes = await fetch(backendUrl, {
       cache: 'no-store',
       headers: {
