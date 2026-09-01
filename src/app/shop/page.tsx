@@ -118,26 +118,16 @@ export default function ShopDashboard() {
   const unsettledOrders = completedOrdersList.filter(o => o.settlementStatus === 'PENDING');
   const paymentToReceive = unsettledOrders.reduce((sum, order) => {
     let earningsForShop = 0;
-    const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup';
+    const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup' || order.deliveryType === 'SELF_PICKUP' || order.deliveryType === 'SHOP_PICKUP';
     const actualItemPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
 
     if (isSelfPickup) {
-        if (order.paymentType === 'PREPAID') {
-            earningsForShop = actualItemPrice;
-            if (order.deliveryType === 'HOME_DELIVERY') {
-                earningsForShop += (order.deliveryCharge || 0);
-            }
-            earningsForShop -= (order.pasrCommission || 0);
-        } else {
-            // COD - Shop collected everything
-            earningsForShop = (order.coinDiscount || 0) - (order.pasrCommission || 0);
-        }
+        earningsForShop = order.coinDiscount || 0;
     } else {
-        // PASR Delivery Partner delivered it
         earningsForShop = actualItemPrice;
     }
 
-    return sum + (earningsForShop > 0 ? earningsForShop : 0);
+    return sum + earningsForShop;
   }, 0);
 
   const todaysOrdersList = orders.filter(o => {
@@ -373,7 +363,7 @@ export default function ShopDashboard() {
                 </tr>
               ) : (
                 completedOrdersList.map((order) => {
-                  const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup';
+                  const isSelfPickup = !!order.selfDelivery || order.deliveryType === 'Self Pickup' || order.deliveryType === 'SELF_PICKUP' || order.deliveryType === 'SHOP_PICKUP';
                   const actualPrice = order.subtotalAmount || ((order.totalAmount || 0) + (order.coinDiscount || 0));
                   const coinDiscount = order.coinDiscount || 0;
                   
@@ -381,13 +371,8 @@ export default function ShopDashboard() {
                   let pasrPaysHomeDelivery = 0;
                   
                   if (isSelfPickup) {
-                      if (order.paymentType === 'PREPAID') {
-                          totalPasrWillPay = actualPrice - (order.pasrCommission || 0);
-                          pasrPaysHomeDelivery = totalPasrWillPay - coinDiscount;
-                      } else {
-                          totalPasrWillPay = coinDiscount - (order.pasrCommission || 0);
-                          pasrPaysHomeDelivery = 0;
-                      }
+                      totalPasrWillPay = coinDiscount;
+                      pasrPaysHomeDelivery = 0;
                   } else {
                       totalPasrWillPay = actualPrice;
                       pasrPaysHomeDelivery = totalPasrWillPay - coinDiscount;

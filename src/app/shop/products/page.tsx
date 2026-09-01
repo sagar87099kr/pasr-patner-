@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles, ScanLine } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import { compressImage } from '@/lib/imageCompression';
 import AiCatalogModal from '@/components/AiCatalogModal';
+import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
@@ -24,6 +25,9 @@ export default function ProductsPage() {
     name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [] as string[], productId: '',
     deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true
   });
+  
+  const [showScanner, setShowScanner] = useState(false);
+  const [isScanningLookup, setIsScanningLookup] = useState(false);
   
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -79,6 +83,41 @@ export default function ProductsPage() {
       console.error(e);
     }
     setShowAiModal(true);
+  };
+
+  const handleBarcodeScanned = async (barcode: string) => {
+    setShowScanner(false);
+    setIsScanningLookup(true);
+    
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 1 && data.product) {
+          const product = data.product;
+          
+          let description = product.ingredients_text || product.generic_name || '';
+          if (description) {
+            const words = description.split(' ');
+            description = words.slice(0, 50).join(' ') + (words.length > 50 ? '...' : '');
+          }
+          
+          setNewProduct(prev => ({
+            ...prev,
+            name: product.product_name || product.product_name_en || prev.name,
+            image: product.image_front_url || product.image_url || prev.image,
+            description: description || prev.description
+          }));
+        } else {
+          alert('Product not found in barcode database.');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to lookup barcode', e);
+      alert('Failed to lookup barcode.');
+    } finally {
+      setIsScanningLookup(false);
+    }
   };
 
   // Autocomplete debounce logic
@@ -427,6 +466,31 @@ export default function ProductsPage() {
             </div>
             <form onSubmit={handleAddProduct} className="p-6 overflow-y-auto">
               <div className="space-y-5">
+                <div className="flex items-center justify-between bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                  <div>
+                    <h4 className="text-sm font-bold text-indigo-900">Scan Product Barcode</h4>
+                    <p className="text-xs text-indigo-700 mt-0.5">Auto-fill product name and image</p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowScanner(true)}
+                    disabled={isScanningLookup}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isScanningLookup ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <ScanLine size={14} />
+                        Scan
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 <div className="relative">
                   <label className="block text-sm font-bold text-gray-700 mb-1">Item Name</label>
                   <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter item name" />
@@ -621,6 +685,13 @@ export default function ProductsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showScanner && (
+        <BarcodeScannerModal 
+          onClose={() => setShowScanner(false)} 
+          onScanSuccess={handleBarcodeScanned} 
+        />
       )}
 
       {showAiModal && (
