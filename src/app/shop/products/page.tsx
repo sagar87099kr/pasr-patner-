@@ -511,6 +511,7 @@ export default function ProductsPage() {
                           category: product.itemCategory || product.category || product.product?.category || '',
                           description: product.description || product.product?.description || '',
                           discount: product.discount || product.discountPercent || 0,
+                          barcode: product.barcode || product.product?.barcode || '',
                           image: product.img?.url || product.product?.img?.url || product.image || '',
                           images: product.extraImages ? [product.img?.url, ...product.extraImages.map((e: any) => e.url)].filter(Boolean) : (product.img?.url ? [product.img.url] : [])
                         }); 

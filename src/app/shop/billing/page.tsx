@@ -89,23 +89,27 @@ export default function BillingPage() {
     }
   }, [soundEnabled]);
 
-  // Fetch Products
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await fetch('/api/shop/products');
-        if (res.ok) {
-          const data = await res.json();
-          setProducts(data.products || []);
-        }
-      } catch (e) {
-        console.error('Failed to fetch products', e);
-      } finally {
-        setLoading(false);
+  // Fetch Products with live cache-busting
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/shop/products?t=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.products || [];
+        setProducts(list);
+        return list;
       }
-    };
+    } catch (e) {
+      console.error('Failed to fetch products', e);
+    } finally {
+      setLoading(false);
+    }
+    return [];
+  }, []);
+
+  useEffect(() => {
     fetchProducts();
-  }, [billGenerated]);
+  }, [fetchProducts, billGenerated]);
 
   // Add Item to Cart
   const addToCart = useCallback((product: any) => {
@@ -136,24 +140,41 @@ export default function BillingPage() {
     });
   }, [playBeep]);
 
-  // Fast Barcode Lookup & Add to Cart
-  const handleBarcodeScan = useCallback((scannedCode: string) => {
-    const code = scannedCode.trim();
-    if (!code) return;
+  // Fast Barcode Lookup & Add to Cart (with live inventory fallback)
+  const handleBarcodeScan = useCallback(async (scannedCode: string) => {
+    const raw = scannedCode.trim();
+    if (!raw) return;
 
-    const normalizedCode = code.replace(/^0+/, '');
+    const clean = (str: any) => String(str || '').replace(/[\s-]+/g, '').toLowerCase();
+    const cleanCode = clean(raw);
+    const normalizedCode = cleanCode.replace(/^0+/, '');
 
-    // Search against active shop inventory
-    const matched = products.find(p => {
-      const itemBarcode = String(p.barcode || p.product?.barcode || '').trim();
-      if (itemBarcode) {
-        if (itemBarcode === code) return true;
-        if (itemBarcode.replace(/^0+/, '') === normalizedCode) return true;
+    const findMatch = (items: any[]) => {
+      return items.find(p => {
+        const b1 = clean(p.barcode);
+        const b2 = clean(p.product?.barcode);
+        if (b1 && (b1 === cleanCode || b1.replace(/^0+/, '') === normalizedCode)) return true;
+        if (b2 && (b2 === cleanCode || b2.replace(/^0+/, '') === normalizedCode)) return true;
+        if (String(p._id) === raw) return true;
+        const pName = clean(p.name || p.product?.name);
+        if (pName && pName === cleanCode) return true;
+        return false;
+      });
+    };
+
+    let matched = findMatch(products);
+
+    // If not found in current state, perform a live real-time fetch to ensure freshest inventory
+    if (!matched) {
+      try {
+        const freshList = await fetchProducts();
+        if (freshList && freshList.length > 0) {
+          matched = findMatch(freshList);
+        }
+      } catch (err) {
+        console.warn('Live inventory re-fetch failed', err);
       }
-      if (String(p._id) === code) return true;
-      if ((p.name || p.product?.name || '').toLowerCase() === code.toLowerCase()) return true;
-      return false;
-    });
+    }
 
     if (matched) {
       if (matched.quantity <= 0) {
@@ -167,9 +188,9 @@ export default function BillingPage() {
       setScanToast({ message: `Added +1 ${name} (₹${matched.price || 0})`, type: 'success' });
     } else {
       playBeep('error');
-      setScanToast({ message: `Barcode "${code}" not found in your inventory.`, type: 'warning' });
+      setScanToast({ message: `Barcode "${raw}" not found in your shop inventory.`, type: 'warning' });
     }
-  }, [products, addToCart, playBeep]);
+  }, [products, addToCart, playBeep, fetchProducts]);
 
   // Hardware Barcode Scanner Listener (USB / Bluetooth Laser Scanners)
   useEffect(() => {
