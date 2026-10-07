@@ -90,31 +90,48 @@ export default function ProductsPage() {
     setIsScanningLookup(true);
     
     try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+      const res = await fetch(`/api/shop/products/barcode?barcode=${encodeURIComponent(barcode)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.status === 1 && data.product) {
+        if (data.found && data.product) {
           const product = data.product;
           
-          let description = product.ingredients_text || product.generic_name || '';
-          if (description) {
-            const words = description.split(' ');
-            description = words.slice(0, 50).join(' ') + (words.length > 50 ? '...' : '');
+          const availableCategories = SHOP_CATEGORIES[shopCategory as keyof typeof SHOP_CATEGORIES] || SHOP_CATEGORIES['General Store'] || [];
+          let matchedCategory = '';
+          if (product.category) {
+            const lowerCat = product.category.toLowerCase();
+            const matched = availableCategories.find(c => lowerCat.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(lowerCat));
+            if (matched) {
+              matchedCategory = matched.name;
+            }
           }
           
+          const imgUrl = product.image || '';
+          const imgList = product.images && product.images.length > 0 ? product.images : (imgUrl ? [imgUrl] : []);
+
           setNewProduct(prev => ({
             ...prev,
-            name: product.product_name || product.product_name_en || prev.name,
-            image: product.image_front_url || product.image_url || prev.image,
-            description: description || prev.description
+            name: product.name || prev.name,
+            image: imgUrl || prev.image,
+            images: imgList.length > 0 ? imgList : prev.images,
+            description: product.description || prev.description,
+            category: matchedCategory || prev.category,
+            productId: product.productId || prev.productId
           }));
+          
+          setShowAddModal(true);
         } else {
-          alert('Product not found in barcode database.');
+          alert(`Product barcode (${barcode}) was not found in online databases. Please enter product details manually.`);
+          setShowAddModal(true);
         }
+      } else {
+        alert('Failed to lookup barcode. Please enter product details manually.');
+        setShowAddModal(true);
       }
     } catch (e) {
       console.error('Failed to lookup barcode', e);
-      alert('Failed to lookup barcode.');
+      alert('Failed to lookup barcode. Please enter product details manually.');
+      setShowAddModal(true);
     } finally {
       setIsScanningLookup(false);
     }
@@ -150,13 +167,15 @@ export default function ProductsPage() {
   }, [newProduct.name]);
 
   const handleSelectSuggestion = (suggestion: any) => {
+    const imgUrl = suggestion.img?.url || suggestion.image || '';
     setNewProduct(prev => ({
       ...prev,
       name: suggestion.name,
       productId: suggestion._id,
       description: suggestion.description || prev.description,
       category: suggestion.category || prev.category,
-      image: suggestion.img?.url || suggestion.image || prev.image
+      image: imgUrl || prev.image,
+      images: imgUrl ? [imgUrl] : prev.images
     }));
     setShowSuggestions(false);
   };
@@ -318,7 +337,14 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Products Catalogue</h1>
           <p className="text-gray-500 text-sm mt-1">Manage your inventory, prices, and product details.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button 
+            type="button"
+            onClick={() => setShowScanner(true)}
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+          >
+            <ScanLine size={18} /> Scan Barcode
+          </button>
           <button 
             onClick={openAiStudio}
             className="bg-black hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
