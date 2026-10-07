@@ -10,6 +10,7 @@ interface A4QrPosterModalProps {
   onClose: () => void;
   shopName: string;
   shopLocation?: string;
+  shopPhone?: string;
   activeShopId: string;
   shopImage?: string;
 }
@@ -19,6 +20,7 @@ export default function A4QrPosterModal({
   onClose,
   shopName,
   shopLocation,
+  shopPhone,
   activeShopId,
   shopImage
 }: A4QrPosterModalProps) {
@@ -220,13 +222,13 @@ export default function A4QrPosterModal({
         ctx.fillText(desc, x + 45, y + 210);
       };
 
-      // Card 1: Fast Delivery
+      // Card 1: Same-Day Delivery
       drawValueCard(
         leftColX, propBoxY,
         '🛵',
-        'SUPERFAST HOME DELIVERY',
-        'घर बैठे तुरंत डिलीवरी पाएं',
-        'Direct doorstep delivery in 30-45 mins from this shop.',
+        'SAME-DAY HOME DELIVERY',
+        'उसी दिन घर बैठे डिलीवरी पाएं',
+        'Direct same-day doorstep delivery from this shop.',
         '#4F46E5'
       );
 
@@ -268,7 +270,8 @@ export default function A4QrPosterModal({
 
       ctx.fillStyle = '#64748B';
       ctx.font = 'bold 36px sans-serif';
-      ctx.fillText('Order anytime at www.pasr.in  •  Customer Support Helpline: 7979082525', width / 2, 3250);
+      const footerContactText = shopPhone ? `Shop Contact: ${shopPhone}  •  Order online at www.pasr.in` : 'Order anytime at www.pasr.in  •  PASR Verified Store Standee';
+      ctx.fillText(footerContactText, width / 2, 3250);
 
       ctx.fillStyle = '#94A3B8';
       ctx.font = 'bold 30px sans-serif';
@@ -417,10 +420,10 @@ export default function A4QrPosterModal({
               <div className="bg-slate-50 border border-indigo-100 rounded-lg p-2 flex flex-col justify-center">
                 <div className="flex items-center gap-1 text-indigo-700 font-extrabold text-[9px] leading-tight">
                   <Truck size={12} className="shrink-0" />
-                  <span>FAST HOME DELIVERY</span>
+                  <span>SAME-DAY HOME DELIVERY</span>
                 </div>
-                <span className="text-[8px] font-bold text-indigo-900 mt-0.5">घर बैठे तुरंत डिलीवरी पाएं</span>
-                <span className="text-[7.5px] text-slate-500 leading-tight">30-45 mins delivery to your home</span>
+                <span className="text-[8px] font-bold text-indigo-900 mt-0.5">उसी दिन घर बैठे डिलीवरी पाएं</span>
+                <span className="text-[7.5px] text-slate-500 leading-tight">Same-day doorstep delivery to your home</span>
               </div>
 
               <div className="bg-slate-50 border border-emerald-100 rounded-lg p-2 flex flex-col justify-center">
@@ -458,7 +461,7 @@ export default function A4QrPosterModal({
                 PASR • Local Shopping Made Simple • www.pasr.in
               </p>
               <p className="text-[7.5px] text-slate-400">
-                Helpline: 7979082525 • Authorized PASR Partner Store Standee
+                {shopPhone ? `Shop Contact: ${shopPhone} • Order at www.pasr.in` : 'Order anytime at www.pasr.in • PASR Verified Partner Store'}
               </p>
             </div>
 
