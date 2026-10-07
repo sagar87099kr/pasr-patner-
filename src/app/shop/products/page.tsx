@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles, ScanLine } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles, ScanLine, Image as ImageIcon } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import { compressImage } from '@/lib/imageCompression';
 import AiCatalogModal from '@/components/AiCatalogModal';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
+import SharedImageLibraryModal from '@/components/SharedImageLibraryModal';
 
 export default function ProductsPage() {
   const [search, setSearch] = useState('');
@@ -28,6 +29,8 @@ export default function ProductsPage() {
   
   const [showScanner, setShowScanner] = useState(false);
   const [isScanningLookup, setIsScanningLookup] = useState(false);
+  const [showImageLibrary, setShowImageLibrary] = useState(false);
+  const [imageLibraryTarget, setImageLibraryTarget] = useState<'add' | 'edit'>('add');
   
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -212,6 +215,58 @@ export default function ProductsPage() {
         });
       } catch (err) {
         console.error("Image compression failed", err);
+      }
+    }
+  };
+
+  const handleSelectSharedImage = (selected: any, applyAll: boolean) => {
+    if (imageLibraryTarget === 'add') {
+      if (applyAll) {
+        const availableCategories = SHOP_CATEGORIES[shopCategory as keyof typeof SHOP_CATEGORIES] || SHOP_CATEGORIES['General Store'] || [];
+        let matchedCategory = '';
+        if (selected.category) {
+          const lowerCat = selected.category.toLowerCase();
+          const matched = availableCategories.find(c => lowerCat.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(lowerCat));
+          if (matched) matchedCategory = matched.name;
+        }
+
+        const imgUrl = selected.image || '';
+        const imgList = selected.images && selected.images.length > 0 ? selected.images : (imgUrl ? [imgUrl] : []);
+
+        setNewProduct(prev => ({
+          ...prev,
+          name: selected.name || prev.name,
+          image: imgUrl || prev.image,
+          images: imgList.length > 0 ? imgList : prev.images,
+          description: selected.description || prev.description,
+          category: matchedCategory || prev.category,
+          productId: selected.productId || prev.productId
+        }));
+      } else {
+        const imgUrl = selected.image || '';
+        setNewProduct(prev => {
+          const allImages = [...(prev.images || []), ...(selected.images || (imgUrl ? [imgUrl] : []))];
+          return { ...prev, image: allImages[0] || imgUrl || prev.image, images: allImages };
+        });
+      }
+    } else if (imageLibraryTarget === 'edit' && editingProduct) {
+      if (applyAll) {
+        const imgUrl = selected.image || '';
+        const imgList = selected.images && selected.images.length > 0 ? selected.images : (imgUrl ? [imgUrl] : []);
+
+        setEditingProduct((prev: any) => ({
+          ...prev,
+          name: selected.name || prev.name,
+          image: imgUrl || prev.image,
+          images: imgList.length > 0 ? imgList : prev.images,
+          description: selected.description || prev.description
+        }));
+      } else {
+        const imgUrl = selected.image || '';
+        setEditingProduct((prev: any) => {
+          const allImages = [...(prev.images || []), ...(selected.images || (imgUrl ? [imgUrl] : []))];
+          return { ...prev, image: allImages[0] || imgUrl || prev.image, images: allImages };
+        });
       }
     }
   };
@@ -571,13 +626,23 @@ export default function ProductsPage() {
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-3">
-                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0 text-xs">
                         {newProduct.images && newProduct.images.length > 0 ? 'Add More Images' : 'Choose files'}
                         <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
                       </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageLibraryTarget('add');
+                          setShowImageLibrary(true);
+                        }}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3.5 py-2 rounded-lg transition-colors shrink-0 text-xs flex items-center gap-1.5 border border-indigo-200 shadow-sm"
+                      >
+                        <ImageIcon size={14} /> Browse Shared Images
+                      </button>
                       {(!newProduct.images || newProduct.images.length === 0) && (
-                        <span className="text-sm font-bold text-gray-700 truncate flex-1">
+                        <span className="text-xs font-semibold text-gray-500 truncate flex-1">
                           No files chosen
                         </span>
                       )}
@@ -667,11 +732,21 @@ export default function ProductsPage() {
                         <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
                       </div>
                     ) : null}
-                    <div className="flex items-center gap-3">
-                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0">
-                        Change/Add Images
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="cursor-pointer bg-[#F5F8FF] text-[#4F46E5] font-bold px-4 py-2 rounded-lg hover:bg-[#E5EDFF] transition-colors shrink-0 text-xs">
+                        Upload Files
                         <input type="file" multiple accept="image/*" className="hidden" onChange={handleEditImageUpload} />
                       </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageLibraryTarget('edit');
+                          setShowImageLibrary(true);
+                        }}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3.5 py-2 rounded-lg transition-colors shrink-0 text-xs flex items-center gap-1.5 border border-indigo-200 shadow-sm"
+                      >
+                        <ImageIcon size={14} /> Browse Shared Images
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -743,6 +818,15 @@ export default function ProductsPage() {
             setShowAiModal(false);
             setShowAddModal(true);
           }}
+        />
+      )}
+
+      {showImageLibrary && (
+        <SharedImageLibraryModal
+          initialQuery={imageLibraryTarget === 'add' ? newProduct.name : (editingProduct?.name || '')}
+          shopCategory={shopCategory}
+          onClose={() => setShowImageLibrary(false)}
+          onSelectImage={handleSelectSharedImage}
         />
       )}
     </div>
