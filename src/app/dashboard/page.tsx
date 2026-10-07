@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { Sparkles, Download, Printer } from 'lucide-react';
+import A4QrPosterModal from '@/components/A4QrPosterModal';
 
 export default function PartnerDashboard() {
   const [partnerData, setPartnerData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showA4Poster, setShowA4Poster] = useState(false);
 
   // Fetch live partner data from MongoDB via internal API
   useEffect(() => {
@@ -151,23 +154,50 @@ export default function PartnerDashboard() {
                 </div>
                 
                 {/* QR Code Section */}
-                <div className="flex flex-col items-center p-4 border border-gray-200 rounded-xl bg-gray-50">
-                  <p className="text-sm font-bold text-gray-700 mb-2">Shop QR Code</p>
-                  <div ref={qrRef} className="p-2 bg-white rounded-lg shadow-sm">
+                <div className="flex flex-col items-center p-4 border border-indigo-100 rounded-2xl bg-indigo-50/40 max-w-[220px]">
+                  <p className="text-xs font-extrabold text-indigo-950 mb-2">Shop QR Standee</p>
+                  <div ref={qrRef} className="p-2 bg-white rounded-xl shadow-sm border border-indigo-100">
                     <QRCodeCanvas 
-                      value={`https://pasr.in/shop/${partnerData.activeShopId || 'demo-shop'}`} 
-                      size={120}
+                      value={`https://pasr.in/shops/${partnerData.activeShopId || 'demo-shop'}`} 
+                      size={110}
                       level="H"
                       includeMargin={true}
+                      imageSettings={{
+                        src: "/pasr.jpeg",
+                        height: 24,
+                        width: 24,
+                        excavate: true,
+                      }}
                     />
                   </div>
-                  <button 
-                    onClick={downloadQRCode}
-                    className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                  >
-                    Download QR
-                  </button>
+                  
+                  <div className="mt-3 flex flex-col gap-1.5 w-full">
+                    <button 
+                      onClick={() => setShowA4Poster(true)}
+                      className="w-full flex items-center justify-center gap-1 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm shadow-indigo-200"
+                    >
+                      <Sparkles size={14} />
+                      A4 Standee Poster
+                    </button>
+
+                    <button 
+                      onClick={downloadQRCode}
+                      className="w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-white text-gray-700 text-[11px] font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      <Download size={13} />
+                      QR Only
+                    </button>
+                  </div>
                 </div>
+
+                {/* A4 QR Standee Poster Modal */}
+                <A4QrPosterModal
+                  isOpen={showA4Poster}
+                  onClose={() => setShowA4Poster(false)}
+                  shopName={partnerData.name || 'Store'}
+                  shopLocation="Local Bazaar"
+                  activeShopId={partnerData.activeShopId || 'demo-shop'}
+                />
 
                 <div className="ml-auto mt-4 md:mt-0">
                    <button className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold rounded-lg transition-colors">

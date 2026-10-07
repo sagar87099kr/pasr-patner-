@@ -3,17 +3,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
-import { X, Download, Maximize2 } from 'lucide-react';
+import { X, Download, Maximize2, Sparkles, Printer } from 'lucide-react';
+import A4QrPosterModal from './A4QrPosterModal';
 
 interface ShopProfileModalProps {
   shopName: string;
   shopImage: string;
   activeShopId: string;
+  shopLocation?: string;
 }
 
-export default function ShopProfileModal({ shopName, shopImage, activeShopId }: ShopProfileModalProps) {
+export default function ShopProfileModal({ shopName, shopImage, activeShopId, shopLocation }: ShopProfileModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [qrExpanded, setQrExpanded] = useState(false);
+  const [showA4Poster, setShowA4Poster] = useState(false);
   const [mounted, setMounted] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +56,16 @@ export default function ShopProfileModal({ shopName, shopImage, activeShopId }: 
           <p className="text-gray-500 text-xs">Shop Owner</p>
         </div>
       </div>
+
+      {/* A4 QR Standee Poster Modal */}
+      <A4QrPosterModal 
+        isOpen={showA4Poster}
+        onClose={() => setShowA4Poster(false)}
+        shopName={shopName}
+        shopLocation={shopLocation}
+        activeShopId={activeShopId}
+        shopImage={shopImage}
+      />
 
       {/* Modal Overlay */}
       {isOpen && mounted && createPortal(
@@ -106,13 +119,24 @@ export default function ShopProfileModal({ shopName, shopImage, activeShopId }: 
                     {qrExpanded ? "Click again to minimize" : "Click QR to enlarge"}
                   </p>
 
-                  <button 
-                    onClick={downloadQRCode}
-                    className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-sm shadow-indigo-200"
-                  >
-                    <Download size={18} />
-                    Download QR
-                  </button>
+                  {/* Buttons: Download Standard QR & Download/Print A4 Standee */}
+                  <div className="mt-5 flex flex-col gap-2 w-full">
+                    <button 
+                      onClick={() => setShowA4Poster(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-200 text-xs"
+                    >
+                      <Sparkles size={16} />
+                      Download A4 Standee Poster
+                    </button>
+
+                    <button 
+                      onClick={downloadQRCode}
+                      className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl border border-gray-200 transition-all text-xs"
+                    >
+                      <Download size={15} />
+                      Download Square QR Only
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Shop Image Section (Right Side) */}

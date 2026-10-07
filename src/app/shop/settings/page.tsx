@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, Store, MapPin, Clock, FileText, IndianRupee, QrCode } from 'lucide-react';
+import { Save, Store, MapPin, Clock, FileText, IndianRupee, QrCode, Sparkles } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import A4QrPosterModal from '@/components/A4QrPosterModal';
 
 export default function ShopSettings() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [showA4Poster, setShowA4Poster] = useState(false);
   
   const [settings, setSettings] = useState({
     shopName: '',
@@ -119,34 +121,53 @@ export default function ShopSettings() {
             
             {/* Shop QR Code Toggle/Download inside Basic Info Header */}
             {settings.activeShopId && (
-              <div className="ml-auto flex items-center gap-4 border border-indigo-100 bg-indigo-50/50 p-2 pr-4 rounded-xl">
+              <div className="ml-auto flex items-center gap-3 border border-indigo-100 bg-indigo-50/50 p-2 pr-3 rounded-xl">
                 <div ref={qrRef} className="bg-white p-1 rounded-lg shadow-sm">
                   <QRCodeCanvas 
                     value={`https://pasr.in/shops/${settings.activeShopId}`} 
-                    size={64}
+                    size={52}
                     level="H"
                     includeMargin={false}
                     imageSettings={{
                       src: "/pasr.jpeg",
-                      height: 16,
-                      width: 16,
+                      height: 14,
+                      width: 14,
                       excavate: true,
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-indigo-900 mb-1">Shop QR</p>
-                  <button 
-                    type="button"
-                    onClick={downloadQRCode}
-                    className="text-xs px-3 py-1.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Download
-                  </button>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-bold text-indigo-900">Shop QR Poster</p>
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      type="button"
+                      onClick={() => setShowA4Poster(true)}
+                      className="text-[11px] px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <Sparkles size={12} />
+                      A4 Poster
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={downloadQRCode}
+                      className="text-[11px] px-2 py-1 bg-white border border-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      QR Only
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
           </div>
+
+          {/* A4 QR Standee Poster Modal */}
+          <A4QrPosterModal
+            isOpen={showA4Poster}
+            onClose={() => setShowA4Poster(false)}
+            shopName={settings.shopName || 'Shop'}
+            shopLocation={settings.location || 'Local Bazaar'}
+            activeShopId={settings.activeShopId}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">

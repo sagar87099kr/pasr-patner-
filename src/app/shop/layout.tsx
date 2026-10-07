@@ -12,6 +12,7 @@ export default async function ShopLayout({
   let shopName = "My Shop";
   let shopImage = "";
   let activeShopId = "";
+  let shopLocation = "Local Bazaar";
 
   try {
     const cookieStore = await cookies();
@@ -32,6 +33,7 @@ export default async function ShopLayout({
         if (shop) {
           shopName = shop.businessName || "My Shop";
           shopImage = shop.image || "";
+          shopLocation = shop.location || shop.bazaarName || "Local Bazaar";
         }
       }
     }
@@ -70,6 +72,7 @@ export default async function ShopLayout({
               shopName={shopName} 
               shopImage={shopImage} 
               activeShopId={activeShopId || ''} 
+              shopLocation={shopLocation}
             />
           </div>
         </header>
