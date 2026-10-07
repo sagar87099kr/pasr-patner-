@@ -132,7 +132,7 @@ export default function BillingPage() {
           distanceKm: data.distanceKm || 1.0,
           deliveryCharge: data.deliveryCharge || 0,
           standardCharge: data.standardCharge || 5,
-          freeDeliveryThreshold: data.freeDeliveryThreshold || 150,
+          freeDeliveryThreshold: (data.freeDeliveryThreshold !== undefined) ? data.freeDeliveryThreshold : null,
           isFreeDelivery: data.isFreeDelivery || false
         });
       }
@@ -573,10 +573,20 @@ export default function BillingPage() {
                       )}
                     </div>
 
+                    {/* Dynamic Distance-Based Free Delivery Upsell Prompt */}
                     {!deliveryInfo?.isFreeDelivery && deliveryInfo?.freeDeliveryThreshold && (
-                      <p className="text-[10px] text-indigo-600 mt-0.5">
-                        💡 Add ₹{Math.max(0, deliveryInfo.freeDeliveryThreshold - subtotal)} more for FREE Delivery!
-                      </p>
+                      <div className="mt-1 p-1.5 bg-amber-50/90 border border-amber-200 rounded-lg flex items-center justify-between text-[10.5px] text-amber-900 font-semibold animate-in fade-in">
+                        <span>💡 Add <strong className="text-amber-700 font-bold">₹{Math.max(0, deliveryInfo.freeDeliveryThreshold - subtotal)}</strong> more for FREE Delivery!</span>
+                        <span className="text-[9.5px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">Free above ₹{deliveryInfo.freeDeliveryThreshold}</span>
+                      </div>
+                    )}
+
+                    {/* Free Delivery Success Badge */}
+                    {deliveryInfo?.isFreeDelivery && (
+                      <div className="mt-1 p-1 bg-emerald-100/80 border border-emerald-200 rounded-lg flex items-center gap-1.5 text-[10.5px] text-emerald-800 font-bold animate-in fade-in">
+                        <Sparkles size={13} className="text-emerald-600" />
+                        <span>🎉 FREE Delivery Unlocked for this location!</span>
+                      </div>
                     )}
                   </div>
                 )}
