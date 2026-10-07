@@ -198,7 +198,50 @@ export async function GET(req: Request) {
       }
     }
 
-    // 4. Try MasterProduct Search in Backend (if user is authenticated)
+    // 4. Try UPCitemdb Global Database
+    for (const code of cleanCodes) {
+      try {
+        const upcRes = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(code)}`, {
+          headers: {
+            'User-Agent': 'PASR-Partner-App/2.0',
+            'Accept': 'application/json'
+          },
+          cache: 'no-store'
+        });
+
+        if (upcRes.ok) {
+          const upcData = await upcRes.json();
+          if (upcData.items && upcData.items.length > 0) {
+            const item = upcData.items[0];
+            const name = item.title || item.name || '';
+            const brand = item.brand || '';
+            const img = item.images && item.images.length > 0 ? item.images[0] : '';
+            const description = formatDescription(item.description || '');
+
+            if (name) {
+              return NextResponse.json({
+                success: true,
+                found: true,
+                source: 'upcitemdb',
+                product: {
+                  barcode: code,
+                  name: decodeHtml(name),
+                  brand: decodeHtml(brand),
+                  image: img,
+                  images: item.images || (img ? [img] : []),
+                  description,
+                  category: item.category || 'General'
+                }
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching UPCitemdb:', e);
+      }
+    }
+
+    // 5. Try MasterProduct & Community Database Search in Backend
     if (token) {
       try {
         const backendRes = await fetch(`${BACKEND_URL}/api/shop/products/search?q=${encodeURIComponent(barcode)}`, {
@@ -236,11 +279,11 @@ export async function GET(req: Request) {
       }
     }
 
-    // 5. If not found in any database
+    // 6. If not found in open databases yet
     return NextResponse.json({
       success: true,
       found: false,
-      message: 'Product not found in barcode databases.'
+      message: 'New barcode detected. Please enter product name once to register it.'
     });
 
   } catch (error: any) {

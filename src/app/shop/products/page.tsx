@@ -127,18 +127,15 @@ export default function ProductsPage() {
           setShowAddModal(true);
         } else {
           setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
-          alert(`Product barcode (${cleanBarcode}) was not found in online databases. Please enter product details manually.`);
           setShowAddModal(true);
         }
       } else {
         setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
-        alert('Failed to lookup barcode. Please enter product details manually.');
         setShowAddModal(true);
       }
     } catch (e) {
       console.error('Failed to lookup barcode', e);
       setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
-      alert('Failed to lookup barcode. Please enter product details manually.');
       setShowAddModal(true);
     } finally {
       setIsScanningLookup(false);
