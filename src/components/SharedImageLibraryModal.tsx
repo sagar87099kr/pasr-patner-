@@ -54,7 +54,7 @@ export default function SharedImageLibraryModal({
         const res = await fetch(`/api/shop/products/search?q=a`);
         if (res.ok) {
           const data = await res.json();
-          setResults(data.suggestions || []);
+          setResults((data.suggestions || []).slice(0, 10));
         }
       } else {
         const res = await fetch(`/api/shop/products/search?q=${encodeURIComponent(q)}`);
@@ -67,7 +67,7 @@ export default function SharedImageLibraryModal({
               (it.name && it.name.toLowerCase().includes(category.toLowerCase()))
             );
           }
-          setResults(items);
+          setResults(items.slice(0, 10));
         }
       }
     } catch (e) {

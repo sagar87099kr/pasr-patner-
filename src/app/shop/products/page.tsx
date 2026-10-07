@@ -585,7 +585,7 @@ export default function ProductsPage() {
                           <X size={14} />
                         </button>
                       </div>
-                      {suggestions.map((item, idx) => (
+                      {suggestions.slice(0, 8).map((item, idx) => (
                         <div 
                           key={idx} 
                           className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0"
