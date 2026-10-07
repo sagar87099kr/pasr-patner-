@@ -176,6 +176,7 @@ export default function ProductsPage() {
     setNewProduct(prev => ({
       ...prev,
       name: suggestion.name,
+      barcode: suggestion.barcode || prev.barcode,
       productId: suggestion._id,
       description: suggestion.description || prev.description,
       category: suggestion.category || prev.category,
@@ -237,6 +238,7 @@ export default function ProductsPage() {
 
         setNewProduct(prev => ({
           ...prev,
+          barcode: selected.barcode || prev.barcode,
           name: selected.name || prev.name,
           image: imgUrl || prev.image,
           images: imgList.length > 0 ? imgList : prev.images,
@@ -258,6 +260,7 @@ export default function ProductsPage() {
 
         setEditingProduct((prev: any) => ({
           ...prev,
+          barcode: selected.barcode || prev.barcode,
           name: selected.name || prev.name,
           image: imgUrl || prev.image,
           images: imgList.length > 0 ? imgList : prev.images,

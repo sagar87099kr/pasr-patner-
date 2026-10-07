@@ -13,6 +13,7 @@ interface SharedImageLibraryModalProps {
     description?: string;
     category?: string;
     productId?: string;
+    barcode?: string;
   }, applyAll: boolean) => void;
   onClose: () => void;
 }
@@ -93,6 +94,7 @@ export default function SharedImageLibraryModal({
       name: selectedItem.name,
       description: selectedItem.description,
       category: selectedItem.category,
+      barcode: selectedItem.barcode || '',
       productId: selectedItem._id
     }, applyAll);
     onClose();
