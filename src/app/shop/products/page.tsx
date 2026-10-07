@@ -90,9 +90,16 @@ export default function ProductsPage() {
 
   const handleBarcodeScanned = async (barcode: string) => {
     setShowScanner(false);
-    setIsScanningLookup(true);
     const cleanBarcode = barcode.trim();
-    
+    if (!cleanBarcode) return;
+
+    // If scanning while editing an existing product
+    if (editingProduct && showEditModal) {
+      setEditingProduct((prev: any) => ({ ...prev, barcode: cleanBarcode }));
+      return;
+    }
+
+    setIsScanningLookup(true);
     try {
       const res = await fetch(`/api/shop/products/barcode?barcode=${encodeURIComponent(cleanBarcode)}`);
       if (res.ok) {
@@ -404,13 +411,6 @@ export default function ProductsPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button 
-            type="button"
-            onClick={() => setShowScanner(true)}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
-          >
-            <ScanLine size={18} /> Scan Barcode
-          </button>
-          <button 
             onClick={openAiStudio}
             className="bg-black hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
           >
@@ -705,16 +705,35 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">
-                    Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    value={newProduct.barcode || ''} 
-                    onChange={e => setNewProduct({...newProduct, barcode: e.target.value.trim()})} 
-                    className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
-                    placeholder="e.g. 8901491101837" 
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-bold text-gray-700">
+                      Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors border border-indigo-200/50"
+                    >
+                      <ScanLine size={13} /> Scan with Camera
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={newProduct.barcode || ''} 
+                      onChange={e => setNewProduct({...newProduct, barcode: e.target.value.trim()})} 
+                      className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg pl-4 pr-10 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
+                      placeholder="e.g. 8901491101837" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                      title="Scan barcode with camera"
+                    >
+                      <ScanLine size={16} />
+                    </button>
+                  </div>
                 </div>
 
 
@@ -811,16 +830,35 @@ export default function ProductsPage() {
                   <input required type="number" min="0" value={editingProduct.quantity || editingProduct.qty || ''} onChange={e => setEditingProduct({...editingProduct, quantity: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">
-                    Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    value={editingProduct.barcode || ''} 
-                    onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value.trim()})} 
-                    className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
-                    placeholder="e.g. 8901491101837" 
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-bold text-gray-700">
+                      Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors border border-indigo-200/50"
+                    >
+                      <ScanLine size={13} /> Scan with Camera
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={editingProduct.barcode || ''} 
+                      onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value.trim()})} 
+                      className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg pl-4 pr-10 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
+                      placeholder="e.g. 8901491101837" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                      title="Scan barcode with camera"
+                    >
+                      <ScanLine size={16} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
