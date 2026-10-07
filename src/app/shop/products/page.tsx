@@ -484,8 +484,19 @@ export default function ProductsPage() {
                       <img src={product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'} alt={product.name || product.product?.name || product.product?.productName} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shadow-sm" />
                       <div>
                         <p className="font-bold text-gray-900">{product.name || product.product?.name || product.product?.productName}</p>
-                        <div className="flex items-center text-xs text-gray-500 mt-1 gap-1">
-                          <MapPin size={12} /> {product.loc || 'In Stock'}
+                        <div className="flex items-center flex-wrap gap-2 mt-1">
+                          <span className="flex items-center text-xs text-gray-500 gap-1">
+                            <MapPin size={12} /> {product.loc || 'In Stock'}
+                          </span>
+                          {(product.barcode || product.product?.barcode) ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60" title="Scannable Barcode">
+                              <ScanLine size={11} /> {product.barcode || product.product?.barcode}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 font-mono">
+                              <ScanLine size={11} /> No Barcode
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -153,9 +153,14 @@ export default function BillingPage() {
       return items.find(p => {
         const b1 = clean(p.barcode);
         const b2 = clean(p.product?.barcode);
+        const b3 = clean(p.itemBarcode);
+        const b4 = clean(p.sku);
         if (b1 && (b1 === cleanCode || b1.replace(/^0+/, '') === normalizedCode)) return true;
         if (b2 && (b2 === cleanCode || b2.replace(/^0+/, '') === normalizedCode)) return true;
-        if (String(p._id) === raw) return true;
+        if (b3 && (b3 === cleanCode || b3.replace(/^0+/, '') === normalizedCode)) return true;
+        if (b4 && (b4 === cleanCode || b4.replace(/^0+/, '') === normalizedCode)) return true;
+        if (String(p._id) === raw || String(p.id) === raw) return true;
+        if (String(p.product?._id) === raw) return true;
         const pName = clean(p.name || p.product?.name);
         if (pName && pName === cleanCode) return true;
         return false;
@@ -184,6 +189,7 @@ export default function BillingPage() {
       }
       addToCart(matched);
       playBeep('success');
+      setShowScanner(false); // Auto-close camera scanner after product is added
       const name = matched.name || matched.product?.name || 'Item';
       setScanToast({ message: `Added +1 ${name} (₹${matched.price || 0})`, type: 'success' });
     } else {
