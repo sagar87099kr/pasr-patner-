@@ -20,8 +20,21 @@ export default function ShopRegistration() {
   const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [termsScrolled, setTermsScrolled] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   const categories = Object.keys(SHOP_CATEGORIES);
+
+  const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const maxScroll = scrollHeight - clientHeight;
+    const progress = maxScroll > 0 ? Math.min(100, Math.round((scrollTop / maxScroll) * 100)) : 100;
+    setScrollProgress(progress);
+    if (progress >= 95) {
+      setTermsScrolled(true);
+    }
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -193,9 +206,113 @@ export default function ShopRegistration() {
               </div>
             </div>
 
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  <span>Merchant Agreement & Monthly Subscription *</span>
+                </h3>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${termsScrolled ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                  {termsScrolled ? '✓ Agreement Reviewed' : 'Scroll to bottom'}
+                </span>
+              </div>
+
+              {/* Scrollable Terms Container */}
+              <div 
+                onScroll={handleTermsScroll}
+                className="max-h-64 overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 leading-relaxed space-y-3 shadow-inner"
+              >
+                {/* Summary Grid */}
+                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-indigo-700 text-xs mb-2">Key Policy & Subscription Highlights</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="text-gray-500 block text-[11px] font-semibold">Platform Subscription</span>
+                      <strong className="text-indigo-600">Monthly Storefront Plan</strong>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="text-gray-500 block text-[11px] font-semibold">Billing Frequency</span>
+                      <strong className="text-gray-900">Monthly Recurring / Invoiced</strong>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="text-gray-500 block text-[11px] font-semibold">Settlement Cycle</span>
+                      <strong className="text-gray-900">Direct UPI (T+1 Cycles)</strong>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="text-gray-500 block text-[11px] font-semibold">Order Fulfillment SLA</span>
+                      <strong className="text-gray-900">15 – 25 Mins Preparation</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">1. PREAMBLE & APPLICABILITY</h5>
+                  <p>This Merchant Listing and Service Level Agreement ("Agreement") constitutes a legally binding contract between PASR Platform (Perfectly Assured Service and Rentals) and the Merchant. By listing your shop on PASR, you agree to comply with all operating terms, quality guidelines, and fee policies.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">2. STOREFRONT SUBSCRIPTION & MONTHLY SERVICE CHARGES</h5>
+                  <p><strong>2.1 Monthly Platform Fee:</strong> To maintain an active digital storefront, list inventory, and receive local orders through PASR, the Merchant agrees to pay a monthly recurring platform subscription fee.</p>
+                  <p><strong>2.2 Invoicing:</strong> Monthly charges are invoiced in advance at each monthly billing cycle and can be settled via UPI or deducted from accumulated settlement balances.</p>
+                  <p><strong>2.3 Grace Period:</strong> A 5-day grace period is provided upon invoice generation. Unpaid accounts may be temporarily hidden from customer searches.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">3. PRODUCT COMPLIANCE & PRICING FAIRNESS</h5>
+                  <p>All items must be genuine, unexpired, and strictly sold at or below MRP. Counterfeit, banned, or hazardous goods are strictly forbidden.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">4. ORDER PREPARATION & PACKAGING SLA</h5>
+                  <p>Orders must be acknowledged within 5 minutes and packed in hygienic, tamper-proof packaging within 15–25 minutes for handover to PASR delivery executives.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">5. UPI PAYOUTS & RECONCILIATIONS</h5>
+                  <p>Payouts are credited electronically to the registered UPI ID after deducting customer returns, missing items, or authorized service charges.</p>
+                </div>
+
+                <div>
+                  <h5 className="font-bold text-gray-900">6. GOVERNING LAW & JURISDICTION</h5>
+                  <p>This Agreement is subject to Indian laws and the jurisdiction of courts in Giridih / Jharkhand, India.</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div 
+                  className={`h-1.5 transition-all duration-200 ${termsScrolled ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                  style={{ width: `${scrollProgress}%` }}
+                />
+              </div>
+
+              {/* Locked Checkbox */}
+              <div className="flex items-start gap-3 pt-2">
+                <input 
+                  id="partnerTermsCheck" 
+                  type="checkbox" 
+                  required 
+                  disabled={!termsScrolled}
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                />
+                <label 
+                  htmlFor="partnerTermsCheck" 
+                  className={`text-xs text-gray-700 leading-snug select-none ${termsScrolled ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                >
+                  I have completely scrolled, read, understood, and formally agree to the PASR Merchant Terms of Service, Monthly Platform Subscription Agreement, and Operating Guidelines.
+                </label>
+              </div>
+            </div>
+
             <div className="pt-6">
-              <button disabled={loading} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-md active:scale-[0.98] disabled:opacity-70 flex justify-center items-center">
-                {loading ? 'Creating Profile...' : 'Complete Registration'}
+              <button 
+                disabled={loading || !termsAccepted} 
+                type="submit" 
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              >
+                {loading ? 'Creating Profile...' : 'Complete Registration & List Shop'}
               </button>
             </div>
             
