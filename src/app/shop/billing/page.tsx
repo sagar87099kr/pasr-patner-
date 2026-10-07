@@ -144,7 +144,10 @@ export default function BillingPage() {
   }, [deliveryType, customerCoordinates, customerAddress, subtotal, isFirstOrder]);
 
   useEffect(() => {
-    updateDeliveryPricing();
+    const timer = setTimeout(() => {
+      updateDeliveryPricing();
+    }, 350);
+    return () => clearTimeout(timer);
   }, [updateDeliveryPricing]);
 
   // Total Calculation
@@ -500,7 +503,10 @@ export default function BillingPage() {
                     type="text" 
                     placeholder="Address / Area" 
                     value={customerAddress}
-                    onChange={e => setCustomerAddress(e.target.value)}
+                    onChange={e => {
+                      setCustomerAddress(e.target.value);
+                      setCustomerCoordinates(null);
+                    }}
                     className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
