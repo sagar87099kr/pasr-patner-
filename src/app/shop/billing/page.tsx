@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Search, Plus, Minus, Trash2, ShoppingCart, Receipt, User, Phone, MapPin, 
   Truck, Store, CheckCircle2, AlertCircle, Share2, Printer, ArrowRight, Sparkles,
-  ScanLine, Volume2, VolumeX, Check
+  ScanLine, Volume2, VolumeX, Check, Link2, X, Tag, Box, PackagePlus
 } from 'lucide-react';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
@@ -29,6 +29,17 @@ export default function BillingPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [scanToast, setScanToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
+  // Quick Link Unlinked Barcode Modal State
+  const [unlinkedBarcode, setUnlinkedBarcode] = useState<string | null>(null);
+  const [linkingProductId, setLinkingProductId] = useState<string>('');
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [activeLinkTab, setActiveLinkTab] = useState<'existing' | 'new'>('existing');
+  const [quickNewName, setQuickNewName] = useState('');
+  const [quickNewPrice, setQuickNewPrice] = useState('');
+  const [quickNewStock, setQuickNewStock] = useState('10');
+  const [quickNewCategory, setQuickNewCategory] = useState('General');
 
   // Customer Info State
   const [customerPhone, setCustomerPhone] = useState('');
@@ -140,12 +151,99 @@ export default function BillingPage() {
     });
   }, [playBeep]);
 
-  // Fast Barcode Lookup & Add to Cart (with live inventory fallback)
+  // Link an unlinked barcode to an existing inventory product
+  const handleLinkBarcodeToProduct = async (productToLink: any) => {
+    if (!unlinkedBarcode || !productToLink) return;
+    setIsLinking(true);
+    try {
+      const res = await fetch(`/api/shop/products/${productToLink._id || productToLink.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barcode: unlinkedBarcode,
+          name: productToLink.name || productToLink.product?.name,
+          category: productToLink.itemCategory || productToLink.category || productToLink.product?.category,
+          price: productToLink.price,
+          stock: productToLink.quantity || productToLink.qty
+        })
+      });
+
+      if (res.ok) {
+        const updated = { ...productToLink, barcode: unlinkedBarcode };
+        setProducts(prev => prev.map(p => (p._id === updated._id ? updated : p)));
+        addToCart(updated);
+        playBeep('success');
+        setScanToast({ message: `Linked & Added "${updated.name || 'Product'}" to bill!`, type: 'success' });
+        setUnlinkedBarcode(null);
+        setLinkingProductId('');
+      } else {
+        const data = await res.json();
+        alert(data.message || data.error || 'Failed to link barcode');
+      }
+    } catch (err: any) {
+      alert('Error linking barcode: ' + err.message);
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  // Quick create a new product with the scanned barcode and add to bill
+  const handleQuickCreateProductWithBarcode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlinkedBarcode || !quickNewName.trim() || !quickNewPrice) {
+      alert('Please provide product name and price');
+      return;
+    }
+    setIsLinking(true);
+    try {
+      const payload = {
+        name: quickNewName.trim(),
+        price: Number(quickNewPrice),
+        stock: Number(quickNewStock) || 1,
+        category: quickNewCategory || 'General',
+        barcode: unlinkedBarcode
+      };
+      const res = await fetch('/api/shop/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.product) {
+        const newProd = {
+          ...data.product,
+          name: quickNewName.trim(),
+          price: Number(quickNewPrice),
+          quantity: Number(quickNewStock) || 1,
+          barcode: unlinkedBarcode
+        };
+        setProducts(prev => [newProd, ...prev]);
+        addToCart(newProd);
+        playBeep('success');
+        setScanToast({ message: `Created & added "${quickNewName}" to bill!`, type: 'success' });
+        setUnlinkedBarcode(null);
+        setQuickNewName('');
+        setQuickNewPrice('');
+      } else {
+        alert(data.message || data.error || 'Failed to create product');
+      }
+    } catch (err: any) {
+      alert('Error creating product: ' + err.message);
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  // Fast Barcode Lookup & Add to Cart (with live inventory fallback & quick-link prompt)
   const handleBarcodeScan = useCallback(async (scannedCode: string) => {
     const raw = scannedCode.trim();
     if (!raw) return;
 
-    const clean = (str: any) => String(str || '').replace(/[\s-]+/g, '').toLowerCase();
+    const clean = (str: any) => {
+      let s = String(str || '').trim();
+      s = s.replace(/^\][a-z0-9]{2}/i, ''); // Strip AIM symbology identifiers
+      return s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    };
     const cleanCode = clean(raw);
     const normalizedCode = cleanCode.replace(/^0+/, '');
 
@@ -194,7 +292,12 @@ export default function BillingPage() {
       setScanToast({ message: `Added +1 ${name} (₹${matched.price || 0})`, type: 'success' });
     } else {
       playBeep('error');
-      setScanToast({ message: `Barcode "${raw}" not found in your shop inventory.`, type: 'warning' });
+      setShowScanner(false); // Close camera modal to show the quick link dialog
+      setUnlinkedBarcode(raw);
+      setLinkSearch('');
+      setLinkingProductId('');
+      setActiveLinkTab('existing');
+      setScanToast({ message: `Barcode "${raw}" is not linked to any product yet.`, type: 'warning' });
     }
   }, [products, addToCart, playBeep, fetchProducts]);
 
@@ -952,6 +1055,177 @@ export default function BillingPage() {
           onClose={() => setShowScanner(false)} 
           onScanSuccess={handleBarcodeScan} 
         />
+      )}
+
+      {/* Quick Link Unrecognized Barcode Modal */}
+      {unlinkedBarcode && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={() => setUnlinkedBarcode(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-2xl">
+                  <ScanLine size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Unlinked Barcode</h3>
+                  <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5 mt-0.5">
+                    Code: <span className="font-bold text-gray-800 bg-white px-2 py-0.5 rounded-md border border-gray-200">{unlinkedBarcode}</span>
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setUnlinkedBarcode(null)} className="p-2 hover:bg-white/80 rounded-full transition-colors">
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveLinkTab('existing')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeLinkTab === 'existing' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                <Link2 size={14} /> Link to Existing Item
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveLinkTab('new')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeLinkTab === 'new' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                <PackagePlus size={14} /> Create New Product
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1">
+              {activeLinkTab === 'existing' ? (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search item to link..."
+                      value={linkSearch}
+                      onChange={e => setLinkSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                      autoFocus
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 font-medium">Select a product below to link this barcode permanently and add to bill:</p>
+
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {products
+                      .filter(p => {
+                        const name = (p.name || p.product?.name || '').toLowerCase();
+                        const cat = (p.itemCategory || p.product?.category || '').toLowerCase();
+                        const q = linkSearch.trim().toLowerCase();
+                        return !q || name.includes(q) || cat.includes(q);
+                      })
+                      .map(p => {
+                        const name = p.name || p.product?.name || 'Unknown Item';
+                        const image = p.img?.url || p.product?.img?.url || p.product?.productImage?.[0]?.url || p.image;
+                        return (
+                          <div
+                            key={p._id}
+                            onClick={() => handleLinkBarcodeToProduct(p)}
+                            className="p-3 bg-white border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
+                                {image ? (
+                                  <img src={image} alt={name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Box className="text-gray-400" size={18} />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 text-xs group-hover:text-indigo-600 transition-colors">{name}</p>
+                                <p className="text-[11px] text-gray-500 font-medium">₹{p.price || 0} • Stock: {p.quantity || p.qty || 0}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isLinking}
+                              className="px-3 py-1.5 bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white rounded-xl text-xs font-bold transition-all shrink-0"
+                            >
+                              {isLinking ? 'Linking...' : 'Link & Add'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleQuickCreateProductWithBarcode} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Product Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Pears Pure Soap 75g"
+                      value={quickNewName}
+                      onChange={e => setQuickNewName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Price (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        placeholder="e.g. 45"
+                        value={quickNewPrice}
+                        onChange={e => setQuickNewPrice(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Stock Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="10"
+                        value={quickNewStock}
+                        onChange={e => setQuickNewStock(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
+                    <input
+                      type="text"
+                      placeholder="General Store"
+                      value={quickNewCategory}
+                      onChange={e => setQuickNewCategory(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLinking || !quickNewName.trim() || !quickNewPrice}
+                    className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2"
+                  >
+                    {isLinking ? 'Creating & Linking...' : 'Create & Add to Bill'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
