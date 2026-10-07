@@ -154,12 +154,18 @@ export default function BillingPage() {
   const effectiveDeliveryFee = deliveryType === 'HOME_DELIVERY' ? (deliveryInfo?.deliveryCharge || 0) : 0;
   const grandTotal = subtotal + effectiveDeliveryFee;
 
-  // Filter products by search
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const name = p.name || p.product?.name || '';
-      return name.toLowerCase().includes(search.toLowerCase());
-    });
+  // Filter products by search, or show Top 20 fast-selling items
+  const displayedProducts = useMemo(() => {
+    if (search.trim()) {
+      return products.filter(p => {
+        const name = p.name || p.product?.name || '';
+        return name.toLowerCase().includes(search.toLowerCase());
+      });
+    }
+    // Default: Show top 20 items (in-stock first)
+    return [...products]
+      .sort((a, b) => (b.quantity > 0 ? 1 : 0) - (a.quantity > 0 ? 1 : 0))
+      .slice(0, 20);
   }, [products, search]);
 
   const addToCart = (product: any) => {
@@ -297,16 +303,25 @@ export default function BillingPage() {
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Store className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-bold text-gray-900 text-base">Store Inventory</h3>
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">
-              {filteredProducts.length} items
-            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-sm">
+                  {search.trim() ? 'Search Results' : 'Top 20 Fast-Selling Products'}
+                </h3>
+                <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+                  {displayedProducts.length} items
+                </span>
+              </div>
+              {!search.trim() && (
+                <p className="text-[10px] text-gray-400 font-medium">Use search bar to pick from full {products.length} items</p>
+              )}
+            </div>
           </div>
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 
               type="text" 
-              placeholder="Search by product name..." 
+              placeholder="Search full inventory..." 
               className="w-full pl-9 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-gray-900"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -320,13 +335,13 @@ export default function BillingPage() {
             <div className="col-span-full flex justify-center py-12">
               <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : displayedProducts.length === 0 ? (
             <div className="col-span-full text-center py-12 text-gray-500">
               <ShoppingCart className="mx-auto w-10 h-10 text-gray-300 mb-2" />
               <p className="font-semibold text-sm">No products found</p>
             </div>
           ) : (
-            filteredProducts.map(product => {
+            displayedProducts.map(product => {
               const image = product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image;
               const name = product.name || product.product?.name || 'Unknown Item';
               const isOutOfStock = product.quantity <= 0;
@@ -583,7 +598,7 @@ export default function BillingPage() {
               </div>
 
               <div className="flex overflow-x-auto gap-2 pb-1 snap-x hide-scrollbar">
-                {filteredProducts.slice(0, 10).map(product => {
+                {displayedProducts.slice(0, 15).map(product => {
                   const image = product.img?.url || product.product?.img?.url || product.image;
                   const name = product.name || product.product?.name || 'Item';
                   const isOutOfStock = product.quantity <= 0;
