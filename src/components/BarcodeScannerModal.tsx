@@ -31,6 +31,7 @@ export default function BarcodeScannerModal({
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppingRef = useRef<boolean>(false);
+  const isStartingRef = useRef<boolean>(false);
   const lastScanTimeRef = useRef<number>(0);
   const readerElementId = 'barcode-scanner-viewport';
 
@@ -66,7 +67,10 @@ export default function BarcodeScannerModal({
   }, [onScanSuccess, continuous, recentScanned]);
 
   // Start Camera
-  const startCamera = useCallback(async (cameraId?: string) => {
+  const startCamera = useCallback(async (targetCameraId?: string) => {
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
+
     try {
       setError('');
       setIsCameraReady(false);
@@ -89,26 +93,34 @@ export default function BarcodeScannerModal({
       }
 
       if (scannerRef.current.isScanning) {
-        await scannerRef.current.stop();
+        try {
+          await scannerRef.current.stop();
+        } catch (e) {
+          // ignore stop error
+        }
       }
 
-      // Get available cameras if not loaded
+      // Query available cameras list once if empty
+      let cameraIdToUse = targetCameraId;
       try {
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
           setCameras(devices);
-          if (!cameraId && !selectedCameraId) {
-            // Prefer back/environment camera
-            const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear') || d.label.toLowerCase().includes('environment'));
-            setSelectedCameraId(backCam ? backCam.id : devices[0].id);
+          if (!cameraIdToUse) {
+            const backCam = devices.find(d => 
+              d.label.toLowerCase().includes('back') || 
+              d.label.toLowerCase().includes('rear') || 
+              d.label.toLowerCase().includes('environment')
+            );
+            cameraIdToUse = backCam ? backCam.id : devices[0].id;
           }
         }
       } catch (camErr) {
         console.warn('Unable to query camera list', camErr);
       }
 
-      const cameraConfig = cameraId 
-        ? { deviceId: { exact: cameraId } } 
+      const cameraConfig = cameraIdToUse 
+        ? { deviceId: { exact: cameraIdToUse } } 
         : { facingMode: 'environment' };
 
       await scannerRef.current.start(
@@ -132,10 +144,11 @@ export default function BarcodeScannerModal({
       );
 
       setIsCameraReady(true);
+      setError('');
       
-      // Check if torch/flashlight is supported
+      // Check if torch/flashlight is supported safely
       try {
-        const capabilities = scannerRef.current.getRunningTrackCapabilities();
+        const capabilities = scannerRef.current.getRunningTrackCapabilities?.();
         if (capabilities && (capabilities as any).torch) {
           setHasTorch(true);
         }
@@ -145,14 +158,19 @@ export default function BarcodeScannerModal({
 
     } catch (err: any) {
       console.error('Failed to start camera', err);
-      setIsCameraReady(false);
-      setError(
-        err.name === 'NotAllowedError' 
-          ? 'Camera permission denied. Please allow camera access in your browser settings or use manual entry.'
-          : 'Unable to start camera stream. You can switch camera or enter barcode manually.'
-      );
+      // Only set error if scanner is not actually running
+      if (!scannerRef.current?.isScanning) {
+        setIsCameraReady(false);
+        setError(
+          err.name === 'NotAllowedError' 
+            ? 'Camera permission denied. Please allow camera access in your browser settings or use manual entry.'
+            : 'Unable to start camera stream. You can switch camera or enter barcode manually.'
+        );
+      }
+    } finally {
+      isStartingRef.current = false;
     }
-  }, [handleSuccess, selectedCameraId]);
+  }, [handleSuccess]);
 
   // Initialize camera when mode is 'camera'
   useEffect(() => {
@@ -169,7 +187,7 @@ export default function BarcodeScannerModal({
         });
       }
     }
-  }, [mode, selectedCameraId, startCamera]);
+  }, [mode, startCamera]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -208,7 +226,9 @@ export default function BarcodeScannerModal({
     if (cameras.length <= 1) return;
     const currentIndex = cameras.findIndex(c => c.id === selectedCameraId);
     const nextIndex = (currentIndex + 1) % cameras.length;
-    setSelectedCameraId(cameras[nextIndex].id);
+    const nextId = cameras[nextIndex].id;
+    setSelectedCameraId(nextId);
+    startCamera(nextId);
   };
 
   // Handle image file upload scan
