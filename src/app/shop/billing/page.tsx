@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Search, Plus, Minus, Trash2, ShoppingCart, Receipt, User, Phone, MapPin, 
-  Truck, Store, CheckCircle2, AlertCircle, Share2, Printer, ArrowRight, Sparkles 
+  Truck, Store, CheckCircle2, AlertCircle, Share2, Printer, ArrowRight, Sparkles,
+  ScanLine, Volume2, VolumeX, Check
 } from 'lucide-react';
+import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
 interface CartItem {
   _id: string;
@@ -13,6 +15,7 @@ interface CartItem {
   quantity: number;
   stock: number;
   image: string;
+  barcode?: string;
 }
 
 export default function BillingPage() {
@@ -22,6 +25,11 @@ export default function BillingPage() {
   
   const [cart, setCart] = useState<CartItem[]>([]);
   
+  // Barcode & Audio Feedback State
+  const [showScanner, setShowScanner] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [scanToast, setScanToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
   // Customer Info State
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -49,6 +57,38 @@ export default function BillingPage() {
   const [billGenerated, setBillGenerated] = useState(false);
   const [lastOrderData, setLastOrderData] = useState<any>(null);
 
+  // Synthesize pleasant POS cashier beep sounds
+  const playBeep = useCallback((type: 'success' | 'error' = 'success') => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'success') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1760, ctx.currentTime); // High positive checkout chime
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.12);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime); // Low buzz tone
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+      }
+    } catch (e) {
+      // AudioContext blocked or not supported
+    }
+  }, [soundEnabled]);
+
   // Fetch Products
   useEffect(() => {
     const fetchProducts = async () => {
@@ -66,6 +106,111 @@ export default function BillingPage() {
     };
     fetchProducts();
   }, [billGenerated]);
+
+  // Add Item to Cart
+  const addToCart = useCallback((product: any) => {
+    if (product.quantity <= 0) {
+      playBeep('error');
+      setScanToast({ message: `"${product.name || 'Item'}" is Out of Stock!`, type: 'error' });
+      return;
+    }
+    
+    setCart(prev => {
+      const existing = prev.find(item => item._id === product._id);
+      if (existing) {
+        if (existing.quantity >= product.quantity) {
+          setScanToast({ message: `Maximum stock (${product.quantity}) reached for "${existing.name}"`, type: 'warning' });
+          return prev;
+        }
+        return prev.map(item => item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, {
+        _id: product._id,
+        name: product.name || product.product?.name || 'Unknown Item',
+        price: product.price || 0,
+        quantity: 1,
+        stock: product.quantity,
+        barcode: product.barcode || product.product?.barcode || '',
+        image: product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'
+      }];
+    });
+  }, [playBeep]);
+
+  // Fast Barcode Lookup & Add to Cart
+  const handleBarcodeScan = useCallback((scannedCode: string) => {
+    const code = scannedCode.trim();
+    if (!code) return;
+
+    const normalizedCode = code.replace(/^0+/, '');
+
+    // Search against active shop inventory
+    const matched = products.find(p => {
+      const itemBarcode = String(p.barcode || p.product?.barcode || '').trim();
+      if (itemBarcode) {
+        if (itemBarcode === code) return true;
+        if (itemBarcode.replace(/^0+/, '') === normalizedCode) return true;
+      }
+      if (String(p._id) === code) return true;
+      if ((p.name || p.product?.name || '').toLowerCase() === code.toLowerCase()) return true;
+      return false;
+    });
+
+    if (matched) {
+      if (matched.quantity <= 0) {
+        playBeep('error');
+        setScanToast({ message: `"${matched.name || 'Item'}" is Out of Stock!`, type: 'error' });
+        return;
+      }
+      addToCart(matched);
+      playBeep('success');
+      const name = matched.name || matched.product?.name || 'Item';
+      setScanToast({ message: `Added +1 ${name} (₹${matched.price || 0})`, type: 'success' });
+    } else {
+      playBeep('error');
+      setScanToast({ message: `Barcode "${code}" not found in your inventory.`, type: 'warning' });
+    }
+  }, [products, addToCart, playBeep]);
+
+  // Hardware Barcode Scanner Listener (USB / Bluetooth Laser Scanners)
+  useEffect(() => {
+    let barcodeBuffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (barcodeBuffer.length >= 3) {
+          e.preventDefault();
+          handleBarcodeScan(barcodeBuffer);
+          barcodeBuffer = '';
+        }
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // High typing speed (< 60ms between keystrokes) indicates a laser scanner gun
+        if (timeDiff > 70 && isInput) {
+          barcodeBuffer = e.key;
+        } else {
+          barcodeBuffer += e.key;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleBarcodeScan]);
+
+  // Auto-dismiss scan toast
+  useEffect(() => {
+    if (scanToast) {
+      const timer = setTimeout(() => setScanToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [scanToast]);
 
   // Customer Phone Lookup with Debounce
   useEffect(() => {
@@ -156,10 +301,13 @@ export default function BillingPage() {
 
   // Filter products by search, or show Top 20 fast-selling items
   const displayedProducts = useMemo(() => {
-    if (search.trim()) {
+    const q = search.trim().toLowerCase();
+    if (q) {
       return products.filter(p => {
-        const name = p.name || p.product?.name || '';
-        return name.toLowerCase().includes(search.toLowerCase());
+        const name = (p.name || p.product?.name || '').toLowerCase();
+        const barcode = String(p.barcode || p.product?.barcode || '').toLowerCase();
+        const cat = (p.itemCategory || p.product?.category || '').toLowerCase();
+        return name.includes(q) || barcode.includes(q) || cat.includes(q);
       });
     }
     // Default: Show top 20 items (in-stock first)
@@ -168,31 +316,14 @@ export default function BillingPage() {
       .slice(0, 20);
   }, [products, search]);
 
-  const addToCart = (product: any) => {
-    if (product.quantity <= 0) return;
-    
-    setCart(prev => {
-      const existing = prev.find(item => item._id === product._id);
-      if (existing) {
-        if (existing.quantity >= product.quantity) return prev;
-        return prev.map(item => item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prev, {
-        _id: product._id,
-        name: product.name || product.product?.name || 'Unknown Item',
-        price: product.price || 0,
-        quantity: 1,
-        stock: product.quantity,
-        image: product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image || '/placeholder.png'
-      }];
-    });
-  };
-
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item._id === id) {
         const newQ = item.quantity + delta;
-        if (newQ > item.stock) return item;
+        if (newQ > item.stock) {
+          setScanToast({ message: `Max stock (${item.stock}) reached for "${item.name}"`, type: 'warning' });
+          return item;
+        }
         if (newQ <= 0) return item;
         return { ...item, quantity: newQ };
       }
@@ -300,7 +431,7 @@ export default function BillingPage() {
       <div className="hidden lg:flex flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm flex-col overflow-hidden h-auto">
         
         {/* Catalog Header */}
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Store className="w-5 h-5 text-indigo-600" />
             <div>
@@ -313,19 +444,50 @@ export default function BillingPage() {
                 </span>
               </div>
               {!search.trim() && (
-                <p className="text-[10px] text-gray-400 font-medium">Use search bar to pick from full {products.length} items</p>
+                <p className="text-[10px] text-gray-400 font-medium">Search by name or scan barcode to add directly</p>
               )}
             </div>
           </div>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search full inventory..." 
-              className="w-full pl-9 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-gray-900"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-xl border transition-colors ${
+                soundEnabled 
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' 
+                  : 'bg-gray-100 border-gray-200 text-gray-400 hover:text-gray-600'
+              }`}
+              title={soundEnabled ? 'POS Audio Beep Enabled (Click to mute)' : 'POS Audio Beep Muted (Click to unmute)'}
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-100 shrink-0"
+              title="Open Barcode Scanner Camera (Continuous Scan)"
+            >
+              <ScanLine size={15} />
+              <span>Scan Barcode</span>
+            </button>
+
+            <div className="relative w-60">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+              <input 
+                type="text" 
+                placeholder="Search name or barcode..." 
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-gray-900"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && search.trim()) {
+                    handleBarcodeScan(search.trim());
+                    setSearch('');
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -382,9 +544,20 @@ export default function BillingPage() {
             <Receipt size={22} className="text-indigo-400" />
             <h2 className="text-base font-extrabold tracking-tight">Smart POS Billing</h2>
           </div>
-          <span className="text-xs bg-slate-800 text-indigo-300 px-2.5 py-1 rounded-full font-semibold border border-slate-700">
-            {cart.length} Items in Cart
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              className="lg:hidden p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all shadow-sm"
+              title="Scan Barcode"
+            >
+              <ScanLine size={14} />
+              <span>Scan</span>
+            </button>
+            <span className="text-xs bg-slate-800 text-indigo-300 px-2.5 py-1 rounded-full font-semibold border border-slate-700">
+              {cart.length} Items
+            </span>
+          </div>
         </div>
 
         {billGenerated ? (
@@ -596,15 +769,31 @@ export default function BillingPage() {
 
             {/* 3. Mobile Product Recommendation / Search Bar */}
             <div className="lg:hidden p-3 border-b border-gray-100 flex flex-col gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                <input 
-                  type="text" 
-                  placeholder="Quick search products to add..." 
-                  className="w-full pl-9 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                  <input 
+                    type="text" 
+                    placeholder="Search name or barcode..." 
+                    className="w-full pl-9 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && search.trim()) {
+                        handleBarcodeScan(search.trim());
+                        setSearch('');
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="p-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg flex items-center justify-center hover:bg-indigo-100"
+                  title="Scan Barcode"
+                >
+                  <ScanLine size={16} />
+                </button>
               </div>
 
               <div className="flex overflow-x-auto gap-2 pb-1 snap-x hide-scrollbar">
@@ -636,7 +825,7 @@ export default function BillingPage() {
                 <div className="flex-1 flex flex-col items-center justify-center text-gray-400 py-8 opacity-70">
                   <ShoppingCart size={36} className="mb-2 text-gray-300" />
                   <p className="font-bold text-xs text-gray-600">No items added to bill</p>
-                  <p className="text-[11px] text-gray-400">Click products from the catalog to add</p>
+                  <p className="text-[11px] text-gray-400">Scan barcodes or click items from the catalog</p>
                 </div>
               ) : (
                 cart.map(item => (
@@ -645,7 +834,14 @@ export default function BillingPage() {
                       {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : null}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h5 className="font-bold text-xs text-gray-900 truncate">{item.name}</h5>
+                      <div className="flex items-center gap-1.5">
+                        <h5 className="font-bold text-xs text-gray-900 truncate">{item.name}</h5>
+                        {item.barcode && (
+                          <span className="text-[9px] font-mono bg-gray-100 text-gray-500 px-1 py-0.2 rounded shrink-0">
+                            {item.barcode.slice(-5)}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-gray-500 font-medium">₹{item.price} x {item.quantity} = <strong className="text-gray-900">₹{item.price * item.quantity}</strong></p>
                     </div>
                     <div className="flex items-center bg-gray-100 rounded-lg border border-gray-200">
@@ -703,6 +899,33 @@ export default function BillingPage() {
         )}
 
       </div>
+
+      {/* Floating Scan Feedback Toast */}
+      {scanToast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2.5 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-4 duration-200 ${
+          scanToast.type === 'success' 
+            ? 'bg-emerald-950/90 text-emerald-100 border-emerald-500/50 backdrop-blur-md'
+            : scanToast.type === 'error'
+              ? 'bg-red-950/90 text-red-100 border-red-500/50 backdrop-blur-md'
+              : 'bg-amber-950/90 text-amber-100 border-amber-500/50 backdrop-blur-md'
+        }`}>
+          {scanToast.type === 'success' && <Check size={16} className="text-emerald-400" />}
+          {scanToast.type === 'error' && <AlertCircle size={16} className="text-red-400" />}
+          {scanToast.type === 'warning' && <AlertCircle size={16} className="text-amber-400" />}
+          <span>{scanToast.message}</span>
+        </div>
+      )}
+
+      {/* Live Barcode Scanner Modal with Continuous Scan Mode */}
+      {showScanner && (
+        <BarcodeScannerModal 
+          continuous={true}
+          title="POS Barcode Scanner"
+          subtitle="Point camera at product barcodes to quickly add items to the bill"
+          onClose={() => setShowScanner(false)} 
+          onScanSuccess={handleBarcodeScan} 
+        />
+      )}
 
     </div>
   );

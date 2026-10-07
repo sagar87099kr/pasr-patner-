@@ -7,9 +7,18 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 interface BarcodeScannerModalProps {
   onScanSuccess: (decodedText: string) => void;
   onClose: () => void;
+  continuous?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
-export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeScannerModalProps) {
+export default function BarcodeScannerModal({ 
+  onScanSuccess, 
+  onClose, 
+  continuous = false,
+  title = 'Scan Barcode',
+  subtitle = 'Auto-fill product information'
+}: BarcodeScannerModalProps) {
   const [mode, setMode] = useState<'camera' | 'manual' | 'upload'>('camera');
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string>('');
@@ -18,13 +27,30 @@ export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeS
   const [hasTorch, setHasTorch] = useState(false);
   const [cameras, setCameras] = useState<any[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [recentScanned, setRecentScanned] = useState<string>('');
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppingRef = useRef<boolean>(false);
+  const lastScanTimeRef = useRef<number>(0);
   const readerElementId = 'barcode-scanner-viewport';
 
   // Handle successful scan
   const handleSuccess = useCallback(async (decodedText: string) => {
+    const text = decodedText.trim();
+    if (!text) return;
+
+    if (continuous) {
+      const now = Date.now();
+      // Debounce repetitive scans within 1.2s for the exact same barcode
+      if (text === recentScanned && now - lastScanTimeRef.current < 1200) {
+        return;
+      }
+      lastScanTimeRef.current = now;
+      setRecentScanned(text);
+      onScanSuccess(text);
+      return;
+    }
+
     if (isStoppingRef.current) return;
     isStoppingRef.current = true;
 
@@ -36,8 +62,8 @@ export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeS
     } catch (e) {
       console.warn('Error stopping scanner on success', e);
     }
-    onScanSuccess(decodedText.trim());
-  }, [onScanSuccess]);
+    onScanSuccess(text);
+  }, [onScanSuccess, continuous, recentScanned]);
 
   // Start Camera
   const startCamera = useCallback(async (cameraId?: string) => {
@@ -226,8 +252,8 @@ export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeS
               <Camera size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Scan Barcode</h3>
-              <p className="text-xs text-gray-500">Auto-fill product information</p>
+              <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+              <p className="text-xs text-gray-500">{subtitle}</p>
             </div>
           </div>
           <button 
@@ -393,6 +419,14 @@ export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeS
             </div>
           )}
 
+          {/* Continuous Mode Last Scanned Feedback */}
+          {continuous && recentScanned && (
+            <div className="w-full mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-emerald-800 text-xs animate-in fade-in">
+              <span className="font-bold">✓ Scanned: <span className="font-mono font-bold text-gray-900">{recentScanned}</span></span>
+              <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-bold">Added</span>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="w-full mt-3 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-red-700 text-xs">
@@ -415,14 +449,16 @@ export default function BarcodeScannerModal({ onScanSuccess, onClose }: BarcodeS
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+        <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
           <span>Supports EAN-13, UPC, Code 128 & QR</span>
           <button 
             type="button" 
             onClick={onClose} 
-            className="font-bold text-gray-600 hover:text-gray-900"
+            className={`font-bold px-3 py-1.5 rounded-lg transition-colors ${
+              continuous ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            Cancel
+            {continuous ? 'Done' : 'Cancel'}
           </button>
         </div>
 

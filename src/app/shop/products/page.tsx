@@ -23,7 +23,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [newProduct, setNewProduct] = useState({ 
-    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [] as string[], productId: '',
+    name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [] as string[], productId: '', barcode: '',
     deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true
   });
   
@@ -91,9 +91,10 @@ export default function ProductsPage() {
   const handleBarcodeScanned = async (barcode: string) => {
     setShowScanner(false);
     setIsScanningLookup(true);
+    const cleanBarcode = barcode.trim();
     
     try {
-      const res = await fetch(`/api/shop/products/barcode?barcode=${encodeURIComponent(barcode)}`);
+      const res = await fetch(`/api/shop/products/barcode?barcode=${encodeURIComponent(cleanBarcode)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.found && data.product) {
@@ -114,6 +115,7 @@ export default function ProductsPage() {
 
           setNewProduct(prev => ({
             ...prev,
+            barcode: cleanBarcode,
             name: product.name || prev.name,
             image: imgUrl || prev.image,
             images: imgList.length > 0 ? imgList : prev.images,
@@ -124,15 +126,18 @@ export default function ProductsPage() {
           
           setShowAddModal(true);
         } else {
-          alert(`Product barcode (${barcode}) was not found in online databases. Please enter product details manually.`);
+          setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
+          alert(`Product barcode (${cleanBarcode}) was not found in online databases. Please enter product details manually.`);
           setShowAddModal(true);
         }
       } else {
+        setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
         alert('Failed to lookup barcode. Please enter product details manually.');
         setShowAddModal(true);
       }
     } catch (e) {
       console.error('Failed to lookup barcode', e);
+      setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
       alert('Failed to lookup barcode. Please enter product details manually.');
       setShowAddModal(true);
     } finally {
@@ -299,6 +304,7 @@ export default function ProductsPage() {
             category: newProduct.category,
             description: newProduct.description,
             discount: data.product.discount,
+            barcode: newProduct.barcode || data.product.barcode || '',
             loc: '-',
             image: newProduct.image || '/placeholder.png',
             images: newProduct.images && newProduct.images.length > 0 ? newProduct.images : (newProduct.image ? [newProduct.image] : [])
@@ -306,7 +312,7 @@ export default function ProductsPage() {
           ...prev
         ]);
         setShowAddModal(false);
-        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [], productId: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
+        setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [], productId: '', barcode: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
         alert('Product added successfully!');
       } else {
         alert(data.error || 'Failed to add product');
@@ -344,6 +350,7 @@ export default function ProductsPage() {
         name: editingProduct.name,
         category: editingProduct.category,
         description: editingProduct.description,
+        barcode: editingProduct.barcode || '',
         image: editingProduct.image,
         images: editingProduct.images || (editingProduct.extraImages ? [editingProduct.image, ...editingProduct.extraImages] : [editingProduct.image])
       };
@@ -359,6 +366,7 @@ export default function ProductsPage() {
           quantity: editingProduct.quantity || editingProduct.qty, 
           discount: editingProduct.discount,
           name: editingProduct.name,
+          barcode: editingProduct.barcode || p.barcode || '',
           itemCategory: editingProduct.category,
           description: editingProduct.description,
           image: editingProduct.images && editingProduct.images.length > 0 ? editingProduct.images[0] : (editingProduct.image || ''),
@@ -378,7 +386,9 @@ export default function ProductsPage() {
   };
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = (p.name || p.product?.name || p.product?.productName || '').toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase().trim();
+    const matchesSearch = (p.name || p.product?.name || p.product?.productName || '').toLowerCase().includes(q) ||
+      (p.barcode || p.product?.barcode || '').toLowerCase().includes(q);
     const itemCat = p.itemCategory || p.product?.category || p.product?.categories || p.category;
     const matchesCategory = filterCategory === '' || itemCat === filterCategory;
     return matchesSearch && matchesCategory;
@@ -682,6 +692,19 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={newProduct.barcode || ''} 
+                    onChange={e => setNewProduct({...newProduct, barcode: e.target.value.trim()})} 
+                    className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
+                    placeholder="e.g. 8901491101837" 
+                  />
+                </div>
+
 
               </div>
               <div className="mt-8 pt-4 flex">
@@ -774,6 +797,18 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Stock Quantity</label>
                   <input required type="number" min="0" value={editingProduct.quantity || editingProduct.qty || ''} onChange={e => setEditingProduct({...editingProduct, quantity: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">
+                    Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={editingProduct.barcode || ''} 
+                    onChange={e => setEditingProduct({...editingProduct, barcode: e.target.value.trim()})} 
+                    className="w-full text-gray-900 font-mono font-medium bg-white border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm placeholder:font-sans" 
+                    placeholder="e.g. 8901491101837" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
