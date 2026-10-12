@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles, ScanLine, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Tag, Box, MapPin, X, Sparkles, ScanLine, Image as ImageIcon, AlertTriangle, ArrowRight } from 'lucide-react';
 import { SHOP_CATEGORIES } from '@/lib/categories';
 import { compressImage } from '@/lib/imageCompression';
 import AiCatalogModal from '@/components/AiCatalogModal';
@@ -22,6 +22,8 @@ export default function ProductsPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [alreadyRegisteredProduct, setAlreadyRegisteredProduct] = useState<{ product: any; barcode: string } | null>(null);
+  const [autofillSource, setAutofillSource] = useState<'community' | 'catalog' | ''>('');
   const [newProduct, setNewProduct] = useState({ 
     name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [] as string[], productId: '', barcode: '',
     deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true
@@ -36,6 +38,56 @@ export default function ProductsPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
 
+  // Normalize barcode string for robust matching across AIM identifiers, padding zeroes, etc.
+  const cleanBarcodeString = (str: any) => {
+    let s = String(str || '').trim();
+    s = s.replace(/^\][a-z0-9]{2}/i, ''); // Strip standard AIM symbology identifiers
+    return s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  };
+
+  // Find if an existing product in this shop's inventory matches the barcode
+  const findExistingProductByBarcode = (scannedCode: string) => {
+    const raw = String(scannedCode || '').trim();
+    if (!raw) return null;
+    const cleanCode = cleanBarcodeString(raw);
+    const normalized = cleanCode.replace(/^0+/, '');
+
+    return products.find((p: any) => {
+      const b1 = cleanBarcodeString(p.barcode);
+      const b2 = cleanBarcodeString(p.product?.barcode);
+      const b3 = cleanBarcodeString(p.itemBarcode);
+      if (b1 && b1 === cleanCode) return true;
+      if (b2 && b2 === cleanCode) return true;
+      if (b3 && b3 === cleanCode) return true;
+      if (normalized) {
+        if (b1 && b1.replace(/^0+/, '') === normalized) return true;
+        if (b2 && b2.replace(/^0+/, '') === normalized) return true;
+        if (b3 && b3.replace(/^0+/, '') === normalized) return true;
+      }
+      return false;
+    });
+  };
+
+  // Open the edit modal with complete product data prefilled
+  const openEditModalForProduct = (product: any) => {
+    setEditingProduct({
+      ...product,
+      _id: product._id || product.id,
+      id: product._id || product.id,
+      name: product.name || product.product?.name || '',
+      category: product.itemCategory || product.category || product.product?.category || '',
+      description: product.description || product.product?.description || '',
+      discount: product.discount || product.discountPercent || 0,
+      barcode: product.barcode || product.product?.barcode || '',
+      price: product.price,
+      quantity: product.quantity || product.qty || 1,
+      qty: product.quantity || product.qty || 1,
+      image: product.img?.url || product.product?.img?.url || product.image || '',
+      images: product.extraImages ? [product.img?.url, ...product.extraImages.map((e: any) => e.url)].filter(Boolean) : (product.img?.url ? [product.img.url] : (product.image ? [product.image] : []))
+    });
+    setShowEditModal(true);
+  };
+
   useEffect(() => {
     const fetchShopProfile = async () => {
       try {
@@ -47,11 +99,6 @@ export default function ProductsPage() {
           } else if (data.profile?.type) {
             setShopCategory(data.profile.type);
           }
-          
-          // Fetch AI Credits (we can fetch it directly from the backend API if we know the active shop ID)
-          // Actually, since we're making a direct API call from the client to the Next.js API, we should have a Next.js wrapper for fetching credits.
-          // For now, let's create a quick fetch to the backend assuming we pass shopId. Or better, just add it to a Next.js route later.
-          // We can fetch credits when opening the modal instead.
         }
       } catch (e) {
         console.error('Failed to fetch shop profile', e);
@@ -95,7 +142,23 @@ export default function ProductsPage() {
 
     // If scanning while editing an existing product
     if (editingProduct && showEditModal) {
+      const conflictingOther = findExistingProductByBarcode(cleanBarcode);
+      if (conflictingOther && (conflictingOther._id || conflictingOther.id) !== (editingProduct._id || editingProduct.id)) {
+        alert(`Barcode "${cleanBarcode}" is already assigned to "${conflictingOther.name || conflictingOther.product?.name || 'another product'}". Please use a unique barcode.`);
+        return;
+      }
       setEditingProduct((prev: any) => ({ ...prev, barcode: cleanBarcode }));
+      return;
+    }
+
+    // 1. Instant check: Has this shop already registered this product?
+    const existing = findExistingProductByBarcode(cleanBarcode);
+    if (existing) {
+      setShowAddModal(false);
+      setAlreadyRegisteredProduct({
+        product: existing,
+        barcode: cleanBarcode
+      });
       return;
     }
 
@@ -104,6 +167,17 @@ export default function ProductsPage() {
       const res = await fetch(`/api/shop/products/barcode?barcode=${encodeURIComponent(cleanBarcode)}`);
       if (res.ok) {
         const data = await res.json();
+
+        // If the lookup detected this product is already in the shop's catalogue
+        if (data.alreadyRegistered && (data.existingProduct || data.product)) {
+          setShowAddModal(false);
+          setAlreadyRegisteredProduct({
+            product: data.existingProduct || data.product,
+            barcode: cleanBarcode
+          });
+          return;
+        }
+
         if (data.found && data.product) {
           const product = data.product;
           
@@ -128,26 +202,65 @@ export default function ProductsPage() {
             images: imgList.length > 0 ? imgList : prev.images,
             description: product.description || prev.description,
             category: matchedCategory || prev.category,
-            productId: product.productId || prev.productId
+            productId: product.productId || prev.productId,
+            price: '', // Shop B sets their own price!
+            stock: '1',
+            offer: '0'
           }));
-          
+          setAutofillSource(data.source === 'pasr_community' ? 'community' : (data.source ? 'catalog' : ''));
           setShowAddModal(true);
         } else {
+          setAutofillSource('');
           setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
           setShowAddModal(true);
         }
       } else {
+        setAutofillSource('');
         setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
         setShowAddModal(true);
       }
     } catch (e) {
       console.error('Failed to lookup barcode', e);
+      setAutofillSource('');
       setNewProduct(prev => ({ ...prev, barcode: cleanBarcode }));
       setShowAddModal(true);
     } finally {
       setIsScanningLookup(false);
     }
   };
+
+  // Hardware Barcode Scanner Listener (USB / Bluetooth Laser Scanners)
+  useEffect(() => {
+    let barcodeBuffer = '';
+    let lastKeyTime = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when user is actively typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      // Scanners send keystrokes extremely rapidly (< 60ms between keys)
+      if (currentTime - lastKeyTime > 100) {
+        barcodeBuffer = '';
+      }
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (barcodeBuffer.length >= 3) {
+          handleBarcodeScanned(barcodeBuffer);
+          barcodeBuffer = '';
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [products, editingProduct, showEditModal]);
 
   // Autocomplete debounce logic
   useEffect(() => {
@@ -289,6 +402,20 @@ export default function ProductsPage() {
       alert('Please provide a product name or select from the recommended items list.');
       return;
     }
+
+    // Check if barcode is already registered in this shop
+    if (newProduct.barcode) {
+      const existingWithBarcode = findExistingProductByBarcode(newProduct.barcode);
+      if (existingWithBarcode) {
+        setShowAddModal(false);
+        setAlreadyRegisteredProduct({
+          product: existingWithBarcode,
+          barcode: newProduct.barcode
+        });
+        return;
+      }
+    }
+
     setAddingProduct(true);
     try {
       const payload = {
@@ -300,7 +427,23 @@ export default function ProductsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      // Handle duplicate product registration error from backend
+      if (res.status === 409 || data.alreadyRegistered) {
+        setShowAddModal(false);
+        const existing = data.existingProduct || (newProduct.barcode ? findExistingProductByBarcode(newProduct.barcode) : null);
+        if (existing) {
+          setAlreadyRegisteredProduct({
+            product: existing,
+            barcode: newProduct.barcode || existing.barcode
+          });
+        } else {
+          alert(data.message || 'This product is already registered in your shop catalogue. Please update it.');
+        }
+        return;
+      }
+
       if (res.ok) {
         setProducts(prev => [
           {
@@ -308,6 +451,7 @@ export default function ProductsPage() {
             name: newProduct.name,
             price: data.product.price,
             qty: data.product.quantity,
+            quantity: data.product.quantity,
             category: newProduct.category,
             description: newProduct.description,
             discount: data.product.discount,
@@ -322,7 +466,7 @@ export default function ProductsPage() {
         setNewProduct({ name: '', category: '', price: '', stock: '1', description: '', offer: '0', image: '', images: [], productId: '', barcode: '', deliveryType: 'standard', canDeliverByBike: true, preparationTime: '0', maxDeliveryDistance: '10', availableForDelivery: true });
         alert('Product added successfully!');
       } else {
-        alert(data.error || 'Failed to add product');
+        alert(data.error || data.message || 'Failed to add product');
       }
     } catch (e) {
       alert('Error adding product');
@@ -348,6 +492,15 @@ export default function ProductsPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+
+    if (editingProduct.barcode) {
+      const otherMatch = findExistingProductByBarcode(editingProduct.barcode);
+      if (otherMatch && (otherMatch._id || otherMatch.id) !== (editingProduct._id || editingProduct.id)) {
+        alert(`Barcode "${editingProduct.barcode}" is already assigned to "${otherMatch.name || otherMatch.product?.name || 'another product'}". Please use a unique barcode.`);
+        return;
+      }
+    }
+
     setSavingEdit(true);
     try {
       const payload = {
@@ -366,6 +519,7 @@ export default function ProductsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setProducts(prev => prev.map(p => (p._id || p.id) === (editingProduct._id || editingProduct.id) ? { 
           ...p, 
@@ -383,7 +537,7 @@ export default function ProductsPage() {
         setShowEditModal(false);
         setEditingProduct(null);
       } else {
-        alert('Failed to update product');
+        alert(data.message || data.error || 'Failed to update product');
       }
     } catch (e) {
       alert('Error updating product');
@@ -410,6 +564,13 @@ export default function ProductsPage() {
           <p className="text-gray-500 text-sm mt-1">Manage your inventory, prices, and product details.</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <button 
+            type="button"
+            onClick={() => setShowScanner(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"
+          >
+            <ScanLine size={19} /> Scan Barcode
+          </button>
           <button 
             onClick={openAiStudio}
             className="bg-black hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
@@ -506,7 +667,29 @@ export default function ProductsPage() {
                       <Tag size={12} /> {product.itemCategory || product.product?.category || product.product?.categories || product.category || 'General'}
                     </span>
                   </td>
-                  <td className="p-6 font-bold text-gray-900">₹{product.price}</td>
+                  <td className="p-6">
+                    {(() => {
+                      const originalPrice = Number(product.price || 0);
+                      const discount = Number(product.discount ?? product.discountPercent ?? product.offer ?? product.product?.discount ?? 0);
+                      const hasDiscount = discount > 0 && discount < 100;
+                      const finalPrice = hasDiscount ? Math.round(originalPrice * (1 - discount / 100)) : originalPrice;
+
+                      if (hasDiscount) {
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-extrabold text-gray-900 text-base">₹{finalPrice}</span>
+                              <span className="text-xs text-gray-400 line-through">₹{originalPrice}</span>
+                            </div>
+                            <span className="inline-flex items-center w-fit text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md">
+                              {discount}% OFF
+                            </span>
+                          </div>
+                        );
+                      }
+                      return <span className="font-bold text-gray-900 text-base">₹{originalPrice}</span>;
+                    })()}
+                  </td>
                   <td className="p-6">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${(product.quantity || product.qty) > 10 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
@@ -515,19 +698,7 @@ export default function ProductsPage() {
                   </td>
                   <td className="p-6 text-right">
                     <div className="flex items-center justify-end gap-2 transition-opacity">
-                      <button onClick={() => { 
-                        setEditingProduct({
-                          ...product, 
-                          name: product.name || product.product?.name || '', 
-                          category: product.itemCategory || product.category || product.product?.category || '',
-                          description: product.description || product.product?.description || '',
-                          discount: product.discount || product.discountPercent || 0,
-                          barcode: product.barcode || product.product?.barcode || '',
-                          image: product.img?.url || product.product?.img?.url || product.image || '',
-                          images: product.extraImages ? [product.img?.url, ...product.extraImages.map((e: any) => e.url)].filter(Boolean) : (product.img?.url ? [product.img.url] : [])
-                        }); 
-                        setShowEditModal(true); 
-                      }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                      <button onClick={() => openEditModalForProduct(product)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                         <Edit2 size={18} />
                       </button>
                       <button onClick={() => handleDelete(product._id || product.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
@@ -569,6 +740,30 @@ export default function ProductsPage() {
             </div>
             <form onSubmit={handleAddProduct} className="p-6 overflow-y-auto">
               <div className="space-y-5">
+                {autofillSource && (
+                  <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-emerald-900 text-xs animate-in fade-in">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles size={18} className="text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-bold">
+                          {autofillSource === 'community' ? 'Community Registered Details Loaded:' : 'Catalogue Details Loaded:'}
+                        </span>{' '}
+                        Name, category, and photo auto-filled from database.
+                        <div className="text-[11px] text-emerald-700 mt-0.5 font-medium">
+                          Please enter your selling price, offer, and stock quantity below.
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setAutofillSource('')} 
+                      className="p-1 text-emerald-500 hover:text-emerald-700 rounded-lg shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between bg-indigo-50 p-3 rounded-xl border border-indigo-100">
                   <div>
                     <h4 className="text-sm font-bold text-indigo-900">Scan Product Barcode</h4>
@@ -687,6 +882,12 @@ export default function ProductsPage() {
                     <input type="number" min="0" max="100" value={newProduct.offer} onChange={e => setNewProduct({...newProduct, offer: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0" />
                   </div>
                 </div>
+                {Number(newProduct.offer) > 0 && Number(newProduct.price) > 0 && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs font-semibold text-emerald-800">
+                    <span>Effective Selling Price after {newProduct.offer}% discount:</span>
+                    <span className="font-extrabold text-sm text-emerald-700">₹{Math.round(Number(newProduct.price) * (1 - Number(newProduct.offer) / 100))}</span>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Quantity</label>
@@ -709,13 +910,25 @@ export default function ProductsPage() {
                     <label className="block text-sm font-bold text-gray-700">
                       Barcode / EAN / SKU <span className="text-xs font-normal text-gray-400">(Optional)</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors border border-indigo-200/50"
-                    >
-                      <ScanLine size={13} /> Scan with Camera
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {newProduct.barcode && !newProduct.name && (
+                        <button
+                          type="button"
+                          onClick={() => handleBarcodeScanned(newProduct.barcode)}
+                          disabled={isScanningLookup}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors border border-emerald-200"
+                        >
+                          <Sparkles size={11} /> Auto-Fill
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors border border-indigo-200/50"
+                      >
+                        <ScanLine size={13} /> Scan with Camera
+                      </button>
+                    </div>
                   </div>
                   <div className="relative">
                     <input 
@@ -734,6 +947,35 @@ export default function ProductsPage() {
                       <ScanLine size={16} />
                     </button>
                   </div>
+                  {(() => {
+                    const match = newProduct.barcode ? findExistingProductByBarcode(newProduct.barcode) : null;
+                    if (!match) return null;
+                    return (
+                      <div className="mt-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-amber-900 animate-in fade-in">
+                        <div className="flex items-center gap-2.5 text-xs">
+                          <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                          <div>
+                            <div>
+                              <span className="font-bold">Already Registered:</span> &ldquo;{match.name || match.product?.name || 'This item'}&rdquo; has this barcode.
+                            </div>
+                            <div className="text-[11px] text-amber-700 mt-0.5">
+                              Price: ₹{match.price} • Stock: {match.quantity || match.qty || 1} units
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddModal(false);
+                            openEditModalForProduct(match);
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shrink-0 transition-colors shadow-sm flex items-center gap-1"
+                        >
+                          Update Instead <ArrowRight size={12} />
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
 
 
@@ -825,6 +1067,12 @@ export default function ProductsPage() {
                     <input type="number" min="0" max="100" value={editingProduct.discount || ''} onChange={e => setEditingProduct({...editingProduct, discount: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="0" />
                   </div>
                 </div>
+                {Number(editingProduct.discount) > 0 && Number(editingProduct.price) > 0 && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs font-semibold text-emerald-800">
+                    <span>Effective Selling Price after {editingProduct.discount}% discount:</span>
+                    <span className="font-extrabold text-sm text-emerald-700">₹{Math.round(Number(editingProduct.price) * (1 - Number(editingProduct.discount) / 100))}</span>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Stock Quantity</label>
                   <input required type="number" min="0" value={editingProduct.quantity || editingProduct.qty || ''} onChange={e => setEditingProduct({...editingProduct, quantity: e.target.value})} className="w-full text-gray-900 font-medium bg-white border border-gray-300 rounded-lg px-4 py-3 focus:ring-blue-500 focus:border-blue-500 outline-none" />
@@ -859,6 +1107,17 @@ export default function ProductsPage() {
                       <ScanLine size={16} />
                     </button>
                   </div>
+                  {(() => {
+                    if (!editingProduct.barcode) return null;
+                    const otherMatch = findExistingProductByBarcode(editingProduct.barcode);
+                    if (!otherMatch || (otherMatch._id || otherMatch.id) === (editingProduct._id || editingProduct.id)) return null;
+                    return (
+                      <div className="mt-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+                        <AlertTriangle size={15} className="shrink-0 text-red-500" />
+                        <span><strong>Barcode Conflict:</strong> Already assigned to &ldquo;{otherMatch.name || otherMatch.product?.name || 'another item'}&rdquo;.</span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
@@ -869,6 +1128,77 @@ export default function ProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Product Already Registered Modal */}
+      {alreadyRegisteredProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={() => setAlreadyRegisteredProduct(null)}>
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center border-b border-gray-100 bg-gradient-to-b from-amber-50/70 to-white">
+              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+                <ScanLine size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Product Already Registered!</h3>
+              <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                This product is already in your shop catalogue. You can update its price, stock, or details instead of adding a duplicate.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Product preview card */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="w-16 h-16 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+                  {(alreadyRegisteredProduct.product.img?.url || alreadyRegisteredProduct.product.image || alreadyRegisteredProduct.product.product?.img?.url) ? (
+                    <img 
+                      src={alreadyRegisteredProduct.product.img?.url || alreadyRegisteredProduct.product.image || alreadyRegisteredProduct.product.product?.img?.url} 
+                      alt={alreadyRegisteredProduct.product.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Box size={24} className="text-gray-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-gray-900 text-sm truncate">
+                    {alreadyRegisteredProduct.product.name || alreadyRegisteredProduct.product.product?.name || 'Item'}
+                  </h4>
+                  <p className="text-xs text-gray-500 font-mono mt-0.5">
+                    Barcode: <span className="text-gray-800 font-bold">{alreadyRegisteredProduct.barcode || alreadyRegisteredProduct.product.barcode || 'N/A'}</span>
+                  </p>
+                  <div className="flex items-center gap-2 mt-2 text-xs">
+                    <span className="font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
+                      ₹{alreadyRegisteredProduct.product.price}
+                    </span>
+                    <span className="text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md font-medium">
+                      Stock: {alreadyRegisteredProduct.product.quantity || alreadyRegisteredProduct.product.qty || 1} units
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prod = alreadyRegisteredProduct.product;
+                    setAlreadyRegisteredProduct(null);
+                    openEditModalForProduct(prod);
+                  }}
+                  className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 text-sm"
+                >
+                  <Edit2 size={16} /> Update Existing Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAlreadyRegisteredProduct(null)}
+                  className="w-full py-2.5 px-4 text-gray-500 hover:text-gray-700 hover:bg-gray-100 font-semibold rounded-xl transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

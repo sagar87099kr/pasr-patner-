@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Search, Plus, Minus, Trash2, ShoppingCart, Receipt, User, Phone, MapPin, 
   Truck, Store, CheckCircle2, AlertCircle, Share2, Printer, ArrowRight, Sparkles,
-  ScanLine, Volume2, VolumeX, Check, Link2, X, Tag, Box, PackagePlus
+  ScanLine, Volume2, VolumeX, Check, Link2, X, Tag, Box, PackagePlus, FileText
 } from 'lucide-react';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
@@ -12,11 +12,22 @@ interface CartItem {
   _id: string;
   name: string;
   price: number;
+  originalPrice?: number;
+  discount?: number;
   quantity: number;
   stock: number;
   image: string;
   barcode?: string;
 }
+
+// Calculate discount and effective selling price
+const getPriceDetails = (product: any) => {
+  const originalPrice = Number(product.price || 0);
+  const discount = Number(product.discount ?? product.discountPercent ?? product.offer ?? product.product?.discount ?? 0);
+  const hasDiscount = discount > 0 && discount < 100;
+  const finalPrice = hasDiscount ? Math.round(originalPrice * (1 - discount / 100)) : originalPrice;
+  return { originalPrice, discount, hasDiscount, finalPrice };
+};
 
 export default function BillingPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -48,7 +59,6 @@ export default function BillingPage() {
   const [customerCoordinates, setCustomerCoordinates] = useState<number[] | null>(null);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
   const [isFirstOrder, setIsFirstOrder] = useState<boolean>(false);
-  const [customerCoins, setCustomerCoins] = useState<number>(0);
   const [lookingUpCustomer, setLookingUpCustomer] = useState(false);
 
   // Delivery Mode State
@@ -67,6 +77,7 @@ export default function BillingPage() {
   const [processing, setProcessing] = useState(false);
   const [billGenerated, setBillGenerated] = useState(false);
   const [lastOrderData, setLastOrderData] = useState<any>(null);
+  const [printFormat, setPrintFormat] = useState<'thermal' | 'a4'>('thermal');
 
   // Synthesize pleasant POS cashier beep sounds
   const playBeep = useCallback((type: 'success' | 'error' = 'success') => {
@@ -130,6 +141,8 @@ export default function BillingPage() {
       return;
     }
     
+    const { originalPrice, discount, hasDiscount, finalPrice } = getPriceDetails(product);
+
     setCart(prev => {
       const existing = prev.find(item => item._id === product._id);
       if (existing) {
@@ -142,7 +155,9 @@ export default function BillingPage() {
       return [...prev, {
         _id: product._id,
         name: product.name || product.product?.name || 'Unknown Item',
-        price: product.price || 0,
+        price: finalPrice,
+        originalPrice: originalPrice,
+        discount: hasDiscount ? discount : 0,
         quantity: 1,
         stock: product.quantity,
         barcode: product.barcode || product.product?.barcode || '',
@@ -208,7 +223,21 @@ export default function BillingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 || data.alreadyRegistered) {
+        const prod = data.existingProduct;
+        if (prod) {
+          addToCart(prod);
+          playBeep('success');
+          setScanToast({ message: `"${prod.name || 'Product'}" is already in catalogue and added to bill!`, type: 'warning' });
+        } else {
+          alert(data.message || 'This product is already registered in your shop catalogue.');
+        }
+        setUnlinkedBarcode(null);
+        setQuickNewName('');
+        setQuickNewPrice('');
+        return;
+      }
       if (res.ok && data.product) {
         const newProd = {
           ...data.product,
@@ -289,7 +318,11 @@ export default function BillingPage() {
       playBeep('success');
       setShowScanner(false); // Auto-close camera scanner after product is added
       const name = matched.name || matched.product?.name || 'Item';
-      setScanToast({ message: `Added +1 ${name} (₹${matched.price || 0})`, type: 'success' });
+      const { finalPrice, hasDiscount, discount } = getPriceDetails(matched);
+      setScanToast({ 
+        message: `Added +1 ${name} (₹${finalPrice}${hasDiscount ? ` • ${discount}% OFF` : ''})`, 
+        type: 'success' 
+      });
     } else {
       playBeep('error');
       setShowScanner(false); // Close camera modal to show the quick link dialog
@@ -357,7 +390,6 @@ export default function BillingPage() {
             setCustomerCoordinates(data.customer.geometry?.coordinates || null);
             setIsRegistered(true);
             setIsFirstOrder(data.customer.isFirstOrder || false);
-            setCustomerCoins(data.customer.coins || 0);
           } else {
             setIsRegistered(false);
             setIsFirstOrder(false);
@@ -465,10 +497,26 @@ export default function BillingPage() {
     setCart(prev => prev.filter(item => item._id !== id));
   };
 
+  // Customer Details Validation
+  const cleanCustomerPhone = customerPhone.replace(/\D/g, '').slice(-10);
+  const isCustomerPhoneValid = cleanCustomerPhone.length === 10;
+  const isCustomerNameValid = customerName.trim().length > 0;
+  const isCustomerAddressValid = customerAddress.trim().length > 0;
+  const isCustomerFormValid = isCustomerPhoneValid && isCustomerNameValid && isCustomerAddressValid;
+
   const generateBill = async () => {
     if (cart.length === 0) return;
-    if (deliveryType === 'HOME_DELIVERY' && !customerAddress.trim()) {
-      alert('Please provide customer delivery address for Home Delivery.');
+
+    if (!isCustomerPhoneValid) {
+      alert('Valid 10-digit customer mobile number is mandatory to generate bill.');
+      return;
+    }
+    if (!isCustomerNameValid) {
+      alert('Customer Name is mandatory. Please enter customer name.');
+      return;
+    }
+    if (!isCustomerAddressValid) {
+      alert('Customer Address is mandatory. Please enter customer address.');
       return;
     }
 
@@ -478,9 +526,9 @@ export default function BillingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName: customerName.trim() || 'Customer',
-          customerPhone: customerPhone.trim() || undefined,
-          customerAddress: customerAddress.trim() || undefined,
+          customerName: customerName.trim(),
+          customerPhone: cleanCustomerPhone,
+          customerAddress: customerAddress.trim(),
           deliveryType,
           deliveryCharge: effectiveDeliveryFee,
           distanceKm: deliveryInfo?.distanceKm || 0,
@@ -498,7 +546,8 @@ export default function BillingPage() {
         setLastOrderData({
           order: data.order,
           shopName: data.shopName || 'PASR Partner Shop',
-          shopLocation: data.shopLocation || 'Bazaar'
+          shopLocation: data.shopLocation || 'Bazaar',
+          shopPhone: data.shopPhone || ''
         });
         setBillGenerated(true);
         setCart([]);
@@ -521,6 +570,7 @@ export default function BillingPage() {
     setCustomerCoordinates(null);
     setIsRegistered(null);
     setDeliveryType('SHOP_PICKUP');
+    setPrintFormat('thermal');
   };
 
   // Generate WhatsApp Message Link
@@ -637,23 +687,34 @@ export default function BillingPage() {
               const image = product.img?.url || product.product?.img?.url || product.product?.productImage?.[0]?.url || product.image;
               const name = product.name || product.product?.name || 'Unknown Item';
               const isOutOfStock = product.quantity <= 0;
+              const { originalPrice, discount, hasDiscount, finalPrice } = getPriceDetails(product);
 
               return (
                 <div 
                   key={product._id} 
                   onClick={() => addToCart(product)}
-                  className={`border border-gray-100 rounded-xl p-3 flex flex-col gap-2 transition-all select-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:bg-indigo-50/20 active:scale-[0.98]'}`}
+                  className={`border border-gray-100 rounded-xl p-3 flex flex-col gap-2 transition-all select-none relative ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:bg-indigo-50/20 active:scale-[0.98]'}`}
                 >
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center mb-1">
+                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center mb-1 relative">
                     {image ? (
                       <img src={image} alt={name} className="w-full h-full object-cover" />
                     ) : (
                       <ShoppingCart className="text-gray-400 opacity-50" size={32} />
                     )}
+                    {hasDiscount && (
+                      <span className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-sm">
+                        {discount}% OFF
+                      </span>
+                    )}
                   </div>
                   <h4 className="font-bold text-gray-900 text-xs line-clamp-2 leading-tight">{name}</h4>
                   <div className="flex items-center justify-between mt-auto pt-1 border-t border-gray-50">
-                    <span className="font-extrabold text-indigo-600 text-sm">₹{product.price || 0}</span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-extrabold text-indigo-600 text-sm">₹{finalPrice}</span>
+                      {hasDiscount && (
+                        <span className="text-[10px] text-gray-400 line-through">₹{originalPrice}</span>
+                      )}
+                    </div>
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${isOutOfStock ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
                       {isOutOfStock ? 'Out' : `Stock: ${product.quantity}`}
                     </span>
@@ -691,42 +752,181 @@ export default function BillingPage() {
         </div>
 
         {billGenerated ? (
-          /* ── SUCCESS RECEIPT SCREEN ── */
-          <div className="flex-1 flex flex-col p-6 overflow-y-auto text-center bg-slate-50/50">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
-              <CheckCircle2 size={36} />
+          /* ── SUCCESS RECEIPT SCREEN & BILL BOOK SLIP ── */
+          <div className="flex-1 flex flex-col p-4 sm:p-5 overflow-y-auto text-center bg-slate-50/50">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner shrink-0">
+              <CheckCircle2 size={28} />
             </div>
             
-            <h3 className="text-xl font-extrabold text-gray-900 mb-1">
+            <h3 className="text-lg font-extrabold text-gray-900 mb-0.5">
               {lastOrderData?.order?.deliveryType === 'HOME_DELIVERY' ? 'Home Delivery Dispatched!' : 'Bill Completed!'}
             </h3>
-            <p className="text-xs text-gray-500 mb-4">Invoice #{lastOrderData?.order?.orderId}</p>
+            <p className="text-xs text-gray-500 mb-3 font-mono">Invoice #{lastOrderData?.order?.orderId}</p>
 
-            {/* Receipt Summary Box */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-5 text-left shadow-sm text-xs space-y-2">
-              <div className="flex justify-between pb-2 border-b border-gray-100">
-                <span className="text-gray-500">Customer</span>
-                <span className="font-bold text-gray-900">{lastOrderData?.order?.customerName || 'Customer'}</span>
-              </div>
-              {customerPhone && (
-                <div className="flex justify-between pb-2 border-b border-gray-100">
-                  <span className="text-gray-500">Mobile</span>
-                  <span className="font-bold text-gray-900">{customerPhone}</span>
+            {/* Paper Size / Printer Type Selector */}
+            <div className="flex items-center justify-center gap-1.5 p-1 bg-gray-200/80 rounded-xl mb-3.5 max-w-sm mx-auto w-full">
+              <button
+                type="button"
+                onClick={() => setPrintFormat('thermal')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  printFormat === 'thermal' 
+                    ? 'bg-white text-indigo-700 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Small POS Thermal Roll Printer (80mm / 58mm)"
+              >
+                <Printer size={13} />
+                <span>Small POS Slip (Thermal)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFormat('a4')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  printFormat === 'a4' 
+                    ? 'bg-white text-indigo-700 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Standard A4 Paper Sheet"
+              >
+                <FileText size={13} />
+                <span>Standard A4 Page</span>
+              </button>
+            </div>
+
+            {/* The Bill Book Slip (Printable & Onscreen View) */}
+            <div 
+              id="pos-printable-bill"
+              className={`bg-white border border-gray-200 rounded-2xl p-4 text-left shadow-sm text-xs font-mono select-none mb-4 ${
+                printFormat === 'thermal' ? 'max-w-[340px] mx-auto w-full' : 'w-full'
+              }`}
+            >
+              {/* Store Identity */}
+              <div className="text-center pb-2.5 border-b border-dashed border-gray-300">
+                <h4 className="font-extrabold text-sm text-gray-900 uppercase tracking-tight">
+                  {lastOrderData?.shopName || 'PASR PARTNER STORE'}
+                </h4>
+                <p className="text-[10.5px] text-gray-600 font-sans mt-0.5">
+                  📍 {lastOrderData?.shopLocation || 'Local Bazaar'}
+                </p>
+                {lastOrderData?.shopPhone && (
+                  <p className="text-[10px] text-gray-500 font-sans">
+                    Mob: +91 {lastOrderData.shopPhone}
+                  </p>
+                )}
+                <div className="mt-1 text-[9px] font-bold text-gray-500 uppercase tracking-wider font-sans">
+                  {lastOrderData?.order?.deliveryType === 'HOME_DELIVERY' 
+                    ? '● HOME DELIVERY INVOICE ●' 
+                    : '● CASH MEMO / COUNTER BILL ●'}
                 </div>
-              )}
-              {lastOrderData?.order?.deliveryType === 'HOME_DELIVERY' && (
-                <div className="flex justify-between pb-2 border-b border-gray-100">
-                  <span className="text-gray-500">Delivery Address</span>
-                  <span className="font-bold text-gray-900 text-right max-w-[200px] truncate">{lastOrderData?.order?.deliveryAddress || customerAddress}</span>
-                </div>
-              )}
-              <div className="flex justify-between pb-2 border-b border-gray-100">
-                <span className="text-gray-500">Total Items</span>
-                <span className="font-bold text-gray-900">{lastOrderData?.order?.items?.length || 0}</span>
               </div>
-              <div className="flex justify-between pt-1 font-bold text-sm">
-                <span className="text-gray-900">Total Amount</span>
-                <span className="text-emerald-600 font-extrabold text-base">₹{lastOrderData?.order?.totalAmount}</span>
+
+              {/* Bill & Customer Metadata */}
+              <div className="py-2 border-b border-dashed border-gray-300 text-[10.5px] space-y-1 font-sans">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Bill / Order ID:</span>
+                  <span className="font-bold text-gray-900 font-mono">{lastOrderData?.order?.orderId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Date & Time:</span>
+                  <span className="font-medium text-gray-800">
+                    {new Date(lastOrderData?.order?.createdAt || Date.now()).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short'
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Customer:</span>
+                  <span className="font-bold text-gray-900">{lastOrderData?.order?.customerName || customerName || 'Customer'}</span>
+                </div>
+                {(lastOrderData?.order?.customerPhone || customerPhone) && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Mobile:</span>
+                    <span className="font-medium text-gray-800 font-mono">
+                      +91 {lastOrderData?.order?.customerPhone || customerPhone}
+                    </span>
+                  </div>
+                )}
+                {(lastOrderData?.order?.deliveryAddress || customerAddress) && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Address:</span>
+                    <span className="font-medium text-gray-800 text-right max-w-[190px] truncate">
+                      {lastOrderData?.order?.deliveryAddress || customerAddress}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Product Listing Table (NO IMAGE!) */}
+              <div className="py-2 border-b border-dashed border-gray-300">
+                <div className="grid grid-cols-12 text-[10px] font-bold text-gray-600 pb-1 border-b border-gray-200">
+                  <span className="col-span-6">ITEM</span>
+                  <span className="col-span-2 text-center">QTY</span>
+                  <span className="col-span-2 text-right">RATE</span>
+                  <span className="col-span-2 text-right">AMT</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(lastOrderData?.order?.items || []).map((it: any, idx: number) => (
+                    <div key={idx} className="grid grid-cols-12 text-[10.5px] py-1 items-baseline">
+                      <span className="col-span-6 font-semibold text-gray-900 truncate pr-1" title={it.name}>
+                        {idx + 1}. {it.name}
+                      </span>
+                      <span className="col-span-2 text-center font-bold text-gray-800 font-mono">
+                        {it.quantity}
+                      </span>
+                      <span className="col-span-2 text-right text-gray-600 font-mono">
+                        ₹{it.price}
+                      </span>
+                      <span className="col-span-2 text-right font-bold text-gray-900 font-mono">
+                        ₹{it.price * it.quantity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial Totals & Amount To Receive */}
+              <div className="py-2 border-b border-dashed border-gray-300 text-[11px] space-y-1 font-sans">
+                <div className="flex justify-between text-gray-600">
+                  <span>Total Items / Qty:</span>
+                  <span className="font-bold text-gray-800 font-mono">
+                    {lastOrderData?.order?.items?.length || 0} items ({lastOrderData?.order?.items?.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} pcs)
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Items Subtotal:</span>
+                  <span className="font-bold text-gray-900 font-mono">
+                    ₹{lastOrderData?.order?.subtotalAmount || lastOrderData?.order?.totalAmount}
+                  </span>
+                </div>
+                {lastOrderData?.order?.deliveryType === 'HOME_DELIVERY' && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Delivery Charge:</span>
+                    <span className="font-bold text-gray-900 font-mono">
+                      {lastOrderData?.order?.deliveryCharge === 0 ? '₹0 (FREE)' : `₹${lastOrderData?.order?.deliveryCharge}`}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Total Money To Receive Box */}
+                <div className="mt-1.5 pt-1.5 border-t border-gray-200 flex justify-between items-center text-xs">
+                  <span className="font-extrabold text-gray-900 uppercase">AMOUNT TO RECEIVE:</span>
+                  <span className="font-black text-sm text-indigo-700 font-mono">
+                    ₹{lastOrderData?.order?.totalAmount}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[10px] text-gray-500">
+                  <span>Payment Status:</span>
+                  <span className="font-bold text-emerald-700 uppercase">
+                    {lastOrderData?.order?.paymentType || 'COD'} ({lastOrderData?.order?.paymentStatus || 'COLLECTED'})
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-2 text-center text-[9.5px] text-gray-400 font-sans">
+                <p className="font-bold text-gray-600">✨ Thank you! Visit Again ✨</p>
+                <p className="mt-0.5">Powered by PASR Platform (https://pasr.in)</p>
               </div>
             </div>
 
@@ -744,19 +944,50 @@ export default function BillingPage() {
 
               <button 
                 onClick={() => window.print()}
-                className="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold border border-gray-200 rounded-xl transition-all flex items-center justify-center gap-2 text-xs"
+                className="w-full py-3 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-xs"
               >
                 <Printer size={16} />
-                <span>Print Invoice</span>
+                <span>Print Bill ({printFormat === 'thermal' ? 'Small POS Slip' : 'A4 Page'})</span>
               </button>
 
               <button 
                 onClick={resetPOS}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md mt-2 text-sm"
+                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold border border-gray-200 rounded-xl transition-all text-xs"
               >
                 Start New Bill
               </button>
             </div>
+
+            {/* Print Stylesheet */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                body * {
+                  visibility: hidden !important;
+                }
+                #pos-printable-bill, #pos-printable-bill * {
+                  visibility: visible !important;
+                }
+                #pos-printable-bill {
+                  position: fixed !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  margin: 0 !important;
+                  padding: ${printFormat === 'thermal' ? '2mm 1.5mm' : '8mm 12mm'} !important;
+                  width: ${printFormat === 'thermal' ? '76mm' : '100%'} !important;
+                  max-width: ${printFormat === 'thermal' ? '78mm' : '190mm'} !important;
+                  background: #ffffff !important;
+                  color: #000000 !important;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace !important;
+                  font-size: ${printFormat === 'thermal' ? '11px' : '13px'} !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                }
+                @page {
+                  size: ${printFormat === 'thermal' ? 'auto' : 'A4 portrait'};
+                  margin: ${printFormat === 'thermal' ? '1.5mm 1mm' : '8mm'};
+                }
+              }
+            ` }} />
           </div>
         ) : (
           /* ── POS CART & DETAILS FORM ── */
@@ -764,16 +995,31 @@ export default function BillingPage() {
             {/* 1. Customer Phone Lookup & Auto-fill Section */}
             <div className="p-3.5 bg-slate-50 border-b border-gray-100 flex flex-col gap-2.5">
               
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
+                    Customer Mobile <span className="text-red-500 font-extrabold">*</span>
+                    <span className="text-gray-400 font-normal text-[10px]">(10-digit mandatory)</span>
+                  </label>
+                  {isRegistered === true && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      ✓ Registered Customer
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
                   <input 
                     type="tel" 
                     maxLength={10}
-                    placeholder="Enter Customer Mobile (e.g. 9876543210)" 
+                    placeholder="Enter 10-digit mobile number *" 
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-gray-900"
+                    className={`w-full pl-9 pr-8 py-2 bg-white border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-gray-900 transition-colors ${
+                      customerPhone.length === 10 
+                        ? (isRegistered ? 'border-emerald-400 bg-emerald-50/20' : 'border-indigo-400') 
+                        : (customerPhone.length > 0 ? 'border-amber-300' : 'border-gray-200')
+                    }`}
                   />
                   {lookingUpCustomer && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -783,50 +1029,59 @@ export default function BillingPage() {
 
               {/* Customer Verification Status Badge */}
               {isRegistered === true && (
-                <div className="flex items-center justify-between px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] font-semibold">
+                <div className="flex items-center px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] font-semibold">
                   <span className="flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                    Verified PASR Customer
+                    <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    Auto-fetched details for {customerName ? `"${customerName}"` : 'customer'}
                   </span>
-                  {customerCoins > 0 && (
-                    <span className="text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded">
-                      🪙 {customerCoins} Coins
-                    </span>
-                  )}
                 </div>
               )}
 
               {isRegistered === false && customerPhone.length === 10 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-medium">
-                  <AlertCircle size={14} className="text-amber-600" />
-                  New / Walk-in Customer (Manual details enabled)
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-medium">
+                  <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                  <span>New Customer — <strong>Name & Address are mandatory below</strong></span>
                 </div>
               )}
 
               {/* Name & Address Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="relative">
-                  <User className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                  <input 
-                    type="text" 
-                    placeholder="Customer Name *" 
-                    value={customerName}
-                    onChange={e => setCustomerName(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-gray-700">
+                    Customer Name <span className="text-red-500 font-extrabold">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Customer Name *" 
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      className={`w-full pl-8 pr-3 py-1.5 bg-white border rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                        !customerName.trim() && customerPhone.length === 10 ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
+                      }`}
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                  <input 
-                    type="text" 
-                    placeholder="Address / Area" 
-                    value={customerAddress}
-                    onChange={e => {
-                      setCustomerAddress(e.target.value);
-                      setCustomerCoordinates(null);
-                    }}
-                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-gray-700">
+                    Customer Address <span className="text-red-500 font-extrabold">*</span>
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Address / Area / Landmark *" 
+                      value={customerAddress}
+                      onChange={e => {
+                        setCustomerAddress(e.target.value);
+                        setCustomerCoordinates(null);
+                      }}
+                      className={`w-full pl-8 pr-3 py-1.5 bg-white border rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                        !customerAddress.trim() && customerPhone.length === 10 ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -931,18 +1186,29 @@ export default function BillingPage() {
                   const image = product.img?.url || product.product?.img?.url || product.image;
                   const name = product.name || product.product?.name || 'Item';
                   const isOutOfStock = product.quantity <= 0;
+                  const { originalPrice, discount, hasDiscount, finalPrice } = getPriceDetails(product);
 
                   return (
                     <div 
                       key={product._id} 
                       onClick={() => addToCart(product)}
-                      className={`shrink-0 w-24 border border-gray-100 rounded-lg p-1.5 flex flex-col items-center text-center select-none snap-start ${isOutOfStock ? 'opacity-50' : 'cursor-pointer hover:border-indigo-300 bg-white'}`}
+                      className={`shrink-0 w-24 border border-gray-100 rounded-lg p-1.5 flex flex-col items-center text-center select-none snap-start relative ${isOutOfStock ? 'opacity-50' : 'cursor-pointer hover:border-indigo-300 bg-white'}`}
                     >
-                      <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center mb-1">
+                      <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center mb-1 relative">
                         {image ? <img src={image} alt={name} className="w-full h-full object-cover" /> : <ShoppingCart size={14} className="text-gray-400" />}
                       </div>
+                      {hasDiscount && (
+                        <span className="text-[8px] font-extrabold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded mb-0.5">
+                          {discount}% OFF
+                        </span>
+                      )}
                       <h5 className="font-bold text-[10px] text-gray-900 line-clamp-1 w-full">{name}</h5>
-                      <span className="text-[11px] font-extrabold text-indigo-600">₹{product.price || 0}</span>
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-[11px] font-extrabold text-indigo-600">₹{finalPrice}</span>
+                        {hasDiscount && (
+                          <span className="text-[9px] text-gray-400 line-through">₹{originalPrice}</span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -964,15 +1230,27 @@ export default function BillingPage() {
                       {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : null}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <h5 className="font-bold text-xs text-gray-900 truncate">{item.name}</h5>
+                        {item.discount && item.discount > 0 ? (
+                          <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1 py-0.2 rounded shrink-0">
+                            {item.discount}% OFF
+                          </span>
+                        ) : null}
                         {item.barcode && (
                           <span className="text-[9px] font-mono bg-gray-100 text-gray-500 px-1 py-0.2 rounded shrink-0">
                             {item.barcode.slice(-5)}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500 font-medium">₹{item.price} x {item.quantity} = <strong className="text-gray-900">₹{item.price * item.quantity}</strong></p>
+                      <div className="flex items-baseline gap-1 text-[11px]">
+                        <span className="text-indigo-600 font-bold">₹{item.price}</span>
+                        {item.originalPrice && item.originalPrice > item.price ? (
+                          <span className="text-gray-400 line-through text-[10px]">₹{item.originalPrice}</span>
+                        ) : null}
+                        <span className="text-gray-500">x {item.quantity} =</span>
+                        <strong className="text-gray-900 font-bold">₹{item.price * item.quantity}</strong>
+                      </div>
                     </div>
                     <div className="flex items-center bg-gray-100 rounded-lg border border-gray-200">
                       <button onClick={() => updateQuantity(item._id, -1)} className="p-1 hover:bg-gray-200 rounded-l-lg text-gray-700"><Minus size={14} /></button>
@@ -1007,10 +1285,23 @@ export default function BillingPage() {
                 <span className="text-sm font-bold text-gray-900">Total Payable</span>
                 <span className="font-extrabold text-xl text-indigo-700">₹{grandTotal}</span>
               </div>
+
+              {cart.length > 0 && !isCustomerFormValid && (
+                <div className="mb-2.5 p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-1.5 font-medium animate-in fade-in">
+                  <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                  <span>
+                    {!isCustomerPhoneValid 
+                      ? 'Customer mobile (10 digits) is mandatory.' 
+                      : !isCustomerNameValid 
+                      ? 'Customer name is mandatory.' 
+                      : 'Customer address is mandatory.'}
+                  </span>
+                </div>
+              )}
               
               <button 
                 onClick={generateBill}
-                disabled={cart.length === 0 || processing}
+                disabled={cart.length === 0 || processing || !isCustomerFormValid}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 text-sm"
               >
                 {processing ? (
@@ -1147,7 +1438,23 @@ export default function BillingPage() {
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900 text-xs group-hover:text-indigo-600 transition-colors">{name}</p>
-                                <p className="text-[11px] text-gray-500 font-medium">₹{p.price || 0} • Stock: {p.quantity || p.qty || 0}</p>
+                                {(() => {
+                                  const { originalPrice, discount, hasDiscount, finalPrice } = getPriceDetails(p);
+                                  return (
+                                    <p className="text-[11px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                      <span className="font-bold text-gray-900">₹{finalPrice}</span>
+                                      {hasDiscount && (
+                                        <span className="text-[10px] text-gray-400 line-through">₹{originalPrice}</span>
+                                      )}
+                                      {hasDiscount && (
+                                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded">
+                                          {discount}% OFF
+                                        </span>
+                                      )}
+                                      <span>• Stock: {p.quantity || p.qty || 0}</span>
+                                    </p>
+                                  );
+                                })()}
                               </div>
                             </div>
                             <button

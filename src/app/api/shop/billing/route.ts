@@ -13,8 +13,19 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
+    const cleanPhone = body.customerPhone ? String(body.customerPhone).trim().replace(/\D/g, '').slice(-10) : '';
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return NextResponse.json({ success: false, message: 'Valid 10-digit customer mobile number is mandatory' }, { status: 400 });
+    }
+    if (!body.customerName || !String(body.customerName).trim()) {
+      return NextResponse.json({ success: false, message: 'Customer name is mandatory' }, { status: 400 });
+    }
+    if (!body.customerAddress || !String(body.customerAddress).trim()) {
+      return NextResponse.json({ success: false, message: 'Customer address is mandatory' }, { status: 400 });
+    }
+
     // Attach the active shop ID to the payload to prevent tampering
-    const payload = { ...body, shopId: activeShopId };
+    const payload = { ...body, customerPhone: cleanPhone, shopId: activeShopId };
 
     // Since this is a new local-only endpoint for testing, we point to localhost:8080
     // Once deployed, you should change this back to process.env.BACKEND_URL

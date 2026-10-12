@@ -39,6 +39,84 @@ export async function GET(req: Request) {
 
     const cookieStore = await cookies();
     const token = cookieStore.get('pasr_token')?.value;
+    const activeShopId = cookieStore.get('active_shop_id')?.value;
+
+    // Check if the shop already has this product registered in their catalogue
+    if (activeShopId) {
+      try {
+        const shopRes = await fetch(`${BACKEND_URL}/api/shop/products?shopId=${activeShopId}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || ''}`,
+            'Cookie': `pasr_token=${token || ''}; active_shop_id=${activeShopId}`
+          }
+        });
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          const cleanStr = (s: any) => String(s || '').trim().replace(/^\][a-z0-9]{2}/i, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          const targetClean = cleanStr(barcode);
+          const targetNorm = targetClean.replace(/^0+/, '');
+
+          const existing = (shopData.products || []).find((p: any) => {
+            const b1 = cleanStr(p.barcode);
+            const b2 = cleanStr(p.product?.barcode);
+            if (b1 && b1 === targetClean) return true;
+            if (b2 && b2 === targetClean) return true;
+            if (targetNorm && ((b1 && b1.replace(/^0+/, '') === targetNorm) || (b2 && b2.replace(/^0+/, '') === targetNorm))) return true;
+            return false;
+          });
+
+          if (existing) {
+            return NextResponse.json({
+              success: true,
+              found: true,
+              alreadyRegistered: true,
+              message: `This product is already registered in your shop catalogue as "${existing.name || existing.product?.name || 'Item'}". Please update the existing product instead of creating a duplicate.`,
+              existingProduct: existing,
+              product: {
+                barcode: barcode,
+                name: existing.name || existing.product?.name || '',
+                price: existing.price,
+                stock: existing.quantity,
+                image: existing.img?.url || existing.image || '',
+                category: existing.itemCategory || existing.category || ''
+              }
+            });
+          }
+        }
+      } catch (checkErr) {
+        console.warn('Error checking existing shop products for barcode:', checkErr);
+      }
+    }
+
+    // 2. Query PASR Platform & Community Registry FIRST (Shop A's registered product, Master Products, etc.)
+    try {
+      const backendRes = await fetch(`${BACKEND_URL}/api/shop/products/barcode?barcode=${encodeURIComponent(barcode)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`,
+          'Cookie': `pasr_token=${token || ''}; active_shop_id=${activeShopId || ''}`
+        },
+        cache: 'no-store'
+      });
+
+      if (backendRes.ok) {
+        const backendData = await backendRes.json();
+        if (backendData.found && backendData.product) {
+          return NextResponse.json({
+            success: true,
+            found: true,
+            source: backendData.source || 'pasr_community',
+            product: backendData.product
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching product from PASR community by barcode:', e);
+    }
 
     const cleanCodes = [
       barcode,
@@ -51,7 +129,7 @@ export async function GET(req: Request) {
       'Accept': 'application/json'
     };
 
-    // 1. Try Open Food Facts (v2 API then v0 API)
+    // 3. Fallback: Try Open Food Facts (v2 API then v0 API)
     for (const code of cleanCodes) {
       try {
         const offRes = await fetch(
